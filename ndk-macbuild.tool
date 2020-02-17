@@ -1,7 +1,5 @@
 #!/bin/bash
 
-unset WORKSPACE
-unset PACKAGES_PATH
 BUILDDIR=$(dirname "$0")
 pushd "$BUILDDIR" >/dev/null
 BUILDDIR=$(pwd)
