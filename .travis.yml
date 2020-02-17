@@ -1,0 +1,23 @@
+language: cpp
+
+os: osx
+osx_image: xcode11.3
+
+
+script:
+  - "./ndk-macbuild.tool"
+  
+before_deploy:
+  - git config --local user.name $GIT_USER
+  - git config --local user.email $GIT_EMAIL
+  
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key: $GITHUB_TOKEN
+  file_glob: true
+  file:
+    - Binaries/RELEASE/*.zip
+    - Binaries/DEBUG/*.zip
+  on:
+    tags: true
