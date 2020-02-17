@@ -104,15 +104,6 @@ if [ "$(which mtoc.NEW)" == "" ] || [ "$(which mtoc)" == "" ]; then
   popd >/dev/null
 fi
 
-if [ ! -d "Binaries" ]; then
-  mkdir Binaries || exit 1
-  cd Binaries || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/RELEASE_XCODE5/X64 RELEASE || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/DEBUG_XCODE5/X64 DEBUG || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/NOOPT_XCODE5/X64 NOOPT || exit 1
-  cd .. || exit 1
-fi
-
 while true; do
   if [ "$1" == "--skip-tests" ]; then
     SKIP_TESTS=1

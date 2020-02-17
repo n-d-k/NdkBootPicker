@@ -17,7 +17,7 @@ deploy:
   api_key: $GITHUB_TOKEN
   file_glob: true
   file:
-    - Binaries/RELEASE/*.zip
-    - Binaries/DEBUG/*.zip
+    - UDK/Build/OcSupportPkg/RELEASE_XCODE5/X64/*.zip
+    - UDK/Build/OcSupportPkg/DEBUG_XCODE5/X64/*.zip
   on:
     tags: true
