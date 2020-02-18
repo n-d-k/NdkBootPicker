@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.2"
+#define NDK_BOOTPICKER_VERSION   "0.0.3"
 
 STATIC
 BOOLEAN
@@ -1890,6 +1890,7 @@ UiMenuMain (
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
         FreeImage (mBackgroundImage);
+        ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_ABORTED) {
         TimeOutSeconds = 0;
@@ -1938,6 +1939,7 @@ UiMenuMain (
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
         FreeImage (mBackgroundImage);
+        ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
         return EFI_SUCCESS;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
