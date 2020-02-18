@@ -1894,11 +1894,9 @@ UiMenuMain (
       } else if (KeyIndex == OC_INPUT_ABORTED) {
         TimeOutSeconds = 0;
         break;
-      #ifdef OC_INPUT_F10
-      } else if (KeyIndex == OC_INPUT_F10) {
+      } else if (KeyIndex == OC_INPUT_FUNCTIONAL(10)) {
         TimeOutSeconds = 0;
         TakeScreenShot (L"ScreenShot");
-      #endif
       } else if (KeyIndex == OC_INPUT_MORE) {
         ShowAll = !ShowAll;
         DefaultEntry = mDefaultEntry;
