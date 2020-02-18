@@ -30,11 +30,15 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.1"
+#define NDK_BOOTPICKER_VERSION   "0.0.2"
 
 STATIC
 BOOLEAN
 mAllowSetDefault;
+
+STATIC
+BOOLEAN
+mHideAuxiliary;
 
 STATIC
 UINTN
@@ -84,7 +88,7 @@ mUiScale = 0;
 
 STATIC
 UINTN
-mIconSpaceSize;  // Default 136 pixels space to contain icons with size 128x128, 272 for 256x256 icons size (best for 4k screen).
+mIconSpaceSize;  // Default 136 pixels space to contain icons with size 128x128.
 
 STATIC
 UINTN
@@ -1267,7 +1271,7 @@ TakeScreenShot (
                       );
   FreeImage (Image);
   if (Buffer == NULL) {
-    DEBUG ((DEBUG_INFO, "Fail Encoding!\n"));
+    DEBUG ((DEBUG_INFO, "OCUI: Fail Encoding!\n"));
     return;
   }
   
@@ -1686,26 +1690,6 @@ PrintOcVersion (
 }
 
 STATIC
-VOID
-PrintDefaultBootMode (
-  IN BOOLEAN         ShowAll
-  )
-{
-  CHAR16             String[17];
-  if (ShowAll) {
-    UnicodeSPrint (String, sizeof (String), L"Auto default:%s", mAllowSetDefault ? L"Off" : L"On");
-    PrintTextGraphicXY (String, 10, mScreenHeight - (mFontHeight + 5), mFontColorPixelAlt);
-  } else {
-    ClearScreenArea (&mTransparentPixel,
-                       0,
-                       mScreenHeight - mFontHeight * 2,
-                       mFontWidth * 2 * sizeof (String),
-                       mFontHeight * 2
-                       );
-  }
-}
-
-STATIC
 BOOLEAN
 PrintTimeOutMessage (
   IN UINTN           Timeout
@@ -1800,6 +1784,7 @@ UiMenuMain (
 {
   EFI_STATUS                         Status;
   UINTN                              Index;
+  UINTN                              CustomEntryIndex;
   INTN                               KeyIndex;
   UINT32                             TimeOutSeconds;
   UINTN                              VisibleList[Count];
@@ -1810,7 +1795,6 @@ UiMenuMain (
   UINTN                              StrWidth;
   APPLE_KEY_MAP_AGGREGATOR_PROTOCOL  *KeyMap;
   BOOLEAN                            SetDefault;
-  BOOLEAN                            NewDefault;
   BOOLEAN                            TimeoutExpired;
   OC_STORAGE_CONTEXT                 *Storage;
   
@@ -1818,26 +1802,31 @@ UiMenuMain (
   VisibleIndex     = 0;
   MaxStrWidth      = 0;
   TimeoutExpired   = FALSE;
-  ShowAll          = Context->HideAuxiliary;
+  ShowAll          = !mHideAuxiliary;
   TimeOutSeconds   = Context->TimeoutSeconds;
   mAllowSetDefault = Context->AllowSetDefault;
   Storage          = Context->CustomEntryContext;
   mDefaultEntry    = DefaultEntry;
+  CustomEntryIndex = 0;
   
   if (Storage->FileSystem != NULL && mFileSystem == NULL) {
     mFileSystem = Storage->FileSystem;
-    DEBUG ((DEBUG_INFO, "OCSBM: FileSystem Found!\n"));
+    DEBUG ((DEBUG_INFO, "OCUI: FileSystem Found!\n"));
   }
   
   KeyMap = OcAppleKeyMapInstallProtocols (FALSE);
   if (KeyMap == NULL) {
-    DEBUG ((DEBUG_ERROR, "OCSBM: Missing AppleKeyMapAggregator\n"));
+    DEBUG ((DEBUG_ERROR, "OCUI: Missing AppleKeyMapAggregator\n"));
     return EFI_UNSUPPORTED;
   }
   
   for (Index = 0; Index < MIN (Count, OC_INPUT_MAX); ++Index) {
     StrWidth = UnicodeStringDisplayLength (BootEntries[Index].Name) + ((BootEntries[Index].IsFolder || BootEntries[Index].IsExternal) ? 11 : 5);
     MaxStrWidth = MaxStrWidth > StrWidth ? MaxStrWidth : StrWidth;
+    if (BootEntries[Index].Type == OcBootCustom) {
+      BootEntries[Index].IsAuxiliary = Context->CustomEntries[CustomEntryIndex].Auxiliary;
+      ++CustomEntryIndex;
+    }
   }
   
   OcConsoleControlSetMode (EfiConsoleControlScreenGraphics);
@@ -1849,15 +1838,13 @@ UiMenuMain (
       TimeoutExpired = PrintTimeOutMessage (TimeOutSeconds);
       TimeOutSeconds = TimeoutExpired ? 10000 : TimeOutSeconds;
     }
-    PrintDefaultBootMode (ShowAll);
     PrintOcVersion (Context->TitleSuffix, ShowAll);
     PrintDateTime (ShowAll);
     for (Index = 0, VisibleIndex = 0; Index < MIN (Count, OC_INPUT_MAX); ++Index) {
       if ((BootEntries[Index].Type == OcBootAppleRecovery && !ShowAll)
           || (BootEntries[Index].Type == OcBootUnknown && !ShowAll)
           || (BootEntries[Index].DevicePath == NULL && !ShowAll)
-          || (BootEntries[Index].IsAuxiliary && Context->HideAuxiliary)) {
-        DefaultEntry = DefaultEntry == Index ? 0 : DefaultEntry;
+          || (BootEntries[Index].IsAuxiliary && !ShowAll)) {
         continue;
       }
       if (DefaultEntry == Index) {
@@ -1898,14 +1885,9 @@ UiMenuMain (
           && !BootEntries[DefaultEntry].IsAuxiliary
           && Context->AllowSetDefault
           && SetDefault;
-        NewDefault = BootEntries[DefaultEntry].DevicePath != NULL
-          && !BootEntries[DefaultEntry].IsAuxiliary
-          && !Context->AllowSetDefault
-          && mDefaultEntry != DefaultEntry;
-        
-        if (SetDefault || NewDefault) {
+        if (SetDefault) {
           Status = OcSetDefaultBootEntry (Context, &BootEntries[DefaultEntry]);
-          DEBUG ((DEBUG_INFO, "OCSBM: Setting default - %r\n", Status));
+          DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
         FreeImage (mBackgroundImage);
         return EFI_SUCCESS;
@@ -1953,13 +1935,9 @@ UiMenuMain (
           && !BootEntries[VisibleList[KeyIndex]].IsAuxiliary
           && Context->AllowSetDefault
           && SetDefault;
-        NewDefault = BootEntries[VisibleList[KeyIndex]].DevicePath != NULL
-          && !BootEntries[VisibleList[KeyIndex]].IsAuxiliary
-          && !Context->AllowSetDefault
-          && mDefaultEntry != VisibleList[KeyIndex];
-        if (SetDefault || NewDefault) {
+        if (SetDefault) {
           Status = OcSetDefaultBootEntry (Context, &BootEntries[VisibleList[KeyIndex]]);
-          DEBUG ((DEBUG_INFO, "OCSBM: Setting default - %r\n", Status));
+          DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
         FreeImage (mBackgroundImage);
         return EFI_SUCCESS;
@@ -1981,6 +1959,16 @@ UiMenuMain (
 }
 
 EFI_STATUS
+SystemActionResetNvram (
+  VOID
+  )
+{
+  OcDeleteVariables ();
+  DirectRestCold ();
+  return EFI_DEVICE_ERROR;
+}
+
+EFI_STATUS
 RunBootPicker (
   IN OC_PICKER_CONTEXT  *Context
   )
@@ -1994,15 +1982,17 @@ RunBootPicker (
   INTN                               DefaultEntry;
   BOOLEAN                            ForbidApple;
   
+  mHideAuxiliary = Context->HideAuxiliary;
+  
   AppleBootPolicy = OcAppleBootPolicyInstallProtocol (FALSE);
   if (AppleBootPolicy == NULL) {
-    DEBUG ((DEBUG_ERROR, "OCB: AppleBootPolicy locate failure\n"));
+    DEBUG ((DEBUG_ERROR, "OCUI: AppleBootPolicy locate failure\n"));
     return EFI_NOT_FOUND;
   }
   
   KeyMap = OcAppleKeyMapInstallProtocols (FALSE);
   if (KeyMap == NULL) {
-    DEBUG ((DEBUG_ERROR, "OCB: AppleKeyMap locate failure\n"));
+    DEBUG ((DEBUG_ERROR, "OCUI: AppleKeyMap locate failure\n"));
     return EFI_NOT_FOUND;
   }
 
@@ -2026,22 +2016,15 @@ RunBootPicker (
 
   if (Context->PickerCommand == OcPickerShowPicker && Context->PickerMode == OcPickerModeApple) {
     Status = OcRunAppleBootPicker ();
-    DEBUG ((DEBUG_INFO, "OCB: Apple BootPicker failed - %r, fallback to builtin\n", Status));
+    DEBUG ((DEBUG_INFO, "OCUI: Apple BootPicker failed - %r, fallback to builtin\n", Status));
     ForbidApple = TRUE;
   } else {
     ForbidApple = FALSE;
   }
 
-  if (Context->PickerCommand != OcPickerShowPicker && Context->PickerCommand != OcPickerDefault) {
-    //
-    // We cannot ignore auxiliary entries for all other modes.
-    //
-    Context->HideAuxiliary = FALSE;
-  }
-
   while (TRUE) {
-    DEBUG ((DEBUG_INFO, "OCB: Performing OcScanForBootEntries...\n"));
-
+    DEBUG ((DEBUG_INFO, "OCUI: Performing OcScanForBootEntries...\n"));
+    Context->HideAuxiliary = FALSE;
     Status = OcScanForBootEntries (
       AppleBootPolicy,
       Context,
@@ -2052,12 +2035,12 @@ RunBootPicker (
       );
 
     if (EFI_ERROR (Status)) {
-      DEBUG ((DEBUG_ERROR, "OCB: OcScanForBootEntries failure - %r\n", Status));
+      DEBUG ((DEBUG_ERROR, "OCUI: OcScanForBootEntries failure - %r\n", Status));
       return Status;
     }
 
     if (EntryCount == 0) {
-      DEBUG ((DEBUG_WARN, "OCB: OcScanForBootEntries has no entries\n"));
+      DEBUG ((DEBUG_WARN, "OCUI: OcScanForBootEntries has no entries\n"));
       return EFI_NOT_FOUND;
     }
 
@@ -2073,7 +2056,7 @@ RunBootPicker (
     if (Context->PickerCommand == OcPickerShowPicker) {
       if (!ForbidApple && Context->PickerMode == OcPickerModeApple) {
         Status = OcRunAppleBootPicker ();
-        DEBUG ((DEBUG_INFO, "OCB: Apple BootPicker failed on error - %r, fallback to builtin\n", Status));
+        DEBUG ((DEBUG_INFO, "OCUI: Apple BootPicker failed on error - %r, fallback to builtin\n", Status));
         ForbidApple = TRUE;
       }
 
@@ -2084,19 +2067,16 @@ RunBootPicker (
         DefaultEntry,
         &Chosen
         );
+      
+    } else if (Context->PickerCommand == OcPickerResetNvram) {
+      return SystemActionResetNvram ();
     } else {
       Chosen = &Entries[DefaultEntry];
-      if ((!Context->AllowSetDefault && !Chosen->IsAuxiliary)
-          || (Context->PickerCommand == OcPickerBootApple && !Context->AllowSetDefault)
-          ) {
-        Status = OcSetDefaultBootEntry (Context, Chosen);
-        DEBUG ((DEBUG_INFO, "OCB: New default was set - %r\n", Status));
-      }
       Status = EFI_SUCCESS;
     }
 
     if (EFI_ERROR (Status)) {
-      DEBUG ((DEBUG_ERROR, "OCB: OcShowSimpleBootMenu failed - %r\n", Status));
+      DEBUG ((DEBUG_ERROR, "OCUI: OcShowSimpleBootMenu failed - %r\n", Status));
       OcFreeBootEntries (Entries, EntryCount);
       return Status;
     }
@@ -2106,7 +2086,7 @@ RunBootPicker (
     if (!EFI_ERROR (Status)) {
       DEBUG ((
         DEBUG_INFO,
-        "OCB: Select to boot from %s (T:%d|F:%d)\n",
+        "OCUI: Select to boot from %s (T:%d|F:%d)\n",
         Chosen->Name,
         Chosen->Type,
         Chosen->IsFolder
