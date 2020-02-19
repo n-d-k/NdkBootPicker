@@ -1880,9 +1880,9 @@ UiMenuMain (
     SwitchIconSelection (VisibleIndex, Selected, TRUE);
     PrintTextDesrciption (MaxStrWidth,
                           Selected,
-                          BootEntries[Selected].Name,
-                          BootEntries[Selected].IsExternal,
-                          BootEntries[Selected].IsFolder
+                          BootEntries[DefaultEntry].Name,
+                          BootEntries[DefaultEntry].IsExternal,
+                          BootEntries[DefaultEntry].IsFolder
                           );
     
     if (mMenuImage != NULL) {
