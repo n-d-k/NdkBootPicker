@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.4"
+#define NDK_BOOTPICKER_VERSION   "0.0.5"
 
 STATIC
 BOOLEAN
@@ -1773,6 +1773,20 @@ PrintTextDesrciption (
                  );
 }
 
+STATIC
+VOID
+RestoreConsoleMode (
+  IN OC_PICKER_CONTEXT    *Context
+  )
+{
+  FreeImage (mBackgroundImage);
+  ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
+  OcConsoleControlSetMode (EfiConsoleControlScreenText);
+  if (Context->ConsoleAttributes != 0) {
+    gST->ConOut->SetAttribute (gST->ConOut, Context->ConsoleAttributes & 0x7FU);
+  }
+}
+
 EFI_STATUS
 UiMenuMain (
   IN OC_PICKER_CONTEXT            *Context,
@@ -1797,7 +1811,6 @@ UiMenuMain (
   BOOLEAN                            SetDefault;
   BOOLEAN                            TimeoutExpired;
   OC_STORAGE_CONTEXT                 *Storage;
-  EFI_CONSOLE_CONTROL_SCREEN_MODE    OldMode;
   
   Selected         = 0;
   VisibleIndex     = 0;
@@ -1830,7 +1843,7 @@ UiMenuMain (
     }
   }
   
-  OldMode = OcConsoleControlSetMode (EfiConsoleControlScreenGraphics);
+  OcConsoleControlSetMode (EfiConsoleControlScreenGraphics);
   InitScreen ();
   ClearScreen (&mTransparentPixel);
   
@@ -1890,9 +1903,7 @@ UiMenuMain (
           Status = OcSetDefaultBootEntry (Context, &BootEntries[DefaultEntry]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
-        FreeImage (mBackgroundImage);
-        ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
-        OcConsoleControlSetMode (OldMode);
+        RestoreConsoleMode (Context);
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_ABORTED) {
         TimeOutSeconds = 0;
@@ -1940,9 +1951,7 @@ UiMenuMain (
           Status = OcSetDefaultBootEntry (Context, &BootEntries[VisibleList[KeyIndex]]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
-        FreeImage (mBackgroundImage);
-        ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
-        OcConsoleControlSetMode (OldMode);
+        RestoreConsoleMode (Context);
         return EFI_SUCCESS;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
