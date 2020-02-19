@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.3"
+#define NDK_BOOTPICKER_VERSION   "0.0.4"
 
 STATIC
 BOOLEAN
@@ -1797,6 +1797,7 @@ UiMenuMain (
   BOOLEAN                            SetDefault;
   BOOLEAN                            TimeoutExpired;
   OC_STORAGE_CONTEXT                 *Storage;
+  EFI_CONSOLE_CONTROL_SCREEN_MODE    OldMode;
   
   Selected         = 0;
   VisibleIndex     = 0;
@@ -1829,7 +1830,7 @@ UiMenuMain (
     }
   }
   
-  OcConsoleControlSetMode (EfiConsoleControlScreenGraphics);
+  OldMode = OcConsoleControlSetMode (EfiConsoleControlScreenGraphics);
   InitScreen ();
   ClearScreen (&mTransparentPixel);
   
@@ -1891,6 +1892,7 @@ UiMenuMain (
         }
         FreeImage (mBackgroundImage);
         ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
+        OcConsoleControlSetMode (OldMode);
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_ABORTED) {
         TimeOutSeconds = 0;
@@ -1940,6 +1942,7 @@ UiMenuMain (
         }
         FreeImage (mBackgroundImage);
         ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
+        OcConsoleControlSetMode (OldMode);
         return EFI_SUCCESS;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
