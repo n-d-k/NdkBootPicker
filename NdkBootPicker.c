@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.7"
+#define NDK_BOOTPICKER_VERSION   "0.0.8"
 
 STATIC
 BOOLEAN
@@ -1309,7 +1309,6 @@ CreateIcon (
   IN CHAR16               *Name,
   IN OC_BOOT_ENTRY_TYPE   Type,
   IN UINTN                IconCount,
-  IN BOOLEAN              IsDefault,
   IN BOOLEAN              Ext,
   IN BOOLEAN              Dmg
   )
@@ -1445,7 +1444,7 @@ SwitchIconSelection (
   }
   
   RawCopy (Icon->Image.Bitmap,
-           mMenuImage->Image.Bitmap + (IsTwoRow ? mIconSpaceSize + mIconPaddingSize : mIconPaddingSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
+           mMenuImage->Image.Bitmap + ((IconIndex <= IconsPerRow) ? mIconPaddingSize : mIconPaddingSize + mIconSpaceSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
            Icon->Width,
            Icon->Height,
            Icon->Width,
@@ -1905,7 +1904,6 @@ UiMenuMain (
       VisibleList[VisibleIndex] = Index;
       CreateIcon (BootEntries[Index].Name,
                   BootEntries[Index].Type,
-                  VisibleIndex,
                   VisibleIndex,
                   BootEntries[Index].IsExternal,
                   BootEntries[Index].IsFolder
