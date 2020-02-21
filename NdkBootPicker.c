@@ -106,9 +106,12 @@ STATIC
 EFI_IMAGE_OUTPUT *
 mMenuImage = NULL;
 
-STATIC
 BOOLEAN
-mIsSolidBackground = TRUE;
+mSelectorUsed = TRUE;
+
+STATIC
+INTN
+mMenuFadeIntensity = 150;     // ranging from 0 to 255 0 = completely disappear, 255 = no fading.
 
 /* Colors are now customized by the optional small 16x16 pixels png color example files in Icons folder (Can be anysize only 1st pixels will be used for color setting).
    font_color.png (Entry discription color and selection color)
@@ -454,11 +457,14 @@ RawCopyAlpha (
   IN     INTN                          Width,
   IN     INTN                          Height,
   IN     INTN                          CompLineOffset,
-  IN     INTN                          TopLineOffset
+  IN     INTN                          TopLineOffset,
+  IN     BOOLEAN                       Faded
   )
 {
   INTN       X;
   INTN       Y;
+  INTN       Alpha;
+  INTN       InvAlpha;
 
   if (CompBasePtr == NULL || TopBasePtr == NULL) {
     return;
@@ -469,11 +475,20 @@ RawCopyAlpha (
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *TopPtr = TopBasePtr;
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *CompPtr = CompBasePtr;
     for (X = 0; X < Width; ++X) {
-      if (TopPtr->Red != FirstTopPtr->Red
+      if ((TopPtr->Red != FirstTopPtr->Red
           && TopPtr->Blue != FirstTopPtr->Blue
-          && TopPtr->Reserved != FirstTopPtr->Reserved
+          && TopPtr->Green != FirstTopPtr->Green
+          && TopPtr->Reserved != FirstTopPtr->Reserved)
+          || (TopPtr->Red > 5
+          && TopPtr->Blue > 5
+          && TopPtr->Green > 5)
           ) {
-        *CompPtr = *TopPtr;
+        Alpha =  Faded ? mMenuFadeIntensity + 1 : TopPtr->Reserved + 1;
+        InvAlpha = Faded ? 256 - mMenuFadeIntensity : 256 - TopPtr->Reserved;
+        CompPtr->Blue = (UINT8) ((TopPtr->Blue * Alpha + CompPtr->Blue * InvAlpha) >> 8);
+        CompPtr->Green = (UINT8) ((TopPtr->Green * Alpha + CompPtr->Green * InvAlpha) >> 8);
+        CompPtr->Red = (UINT8) ((TopPtr->Red * Alpha + CompPtr->Red * InvAlpha) >> 8);
+        CompPtr->Reserved = (UINT8) (255);
       }
       TopPtr++;
       CompPtr++;
@@ -971,20 +986,17 @@ BltMenuImage (
            mBackgroundImage->Width
            );
   
-  if (mIsSolidBackground) {
-    ComposeImage (NewImage, Image, 0, 0, FALSE, TRUE);
-  } else {
-    RawCopyAlpha (NewImage->Image.Bitmap,
-                  Image->Image.Bitmap,
-                  NewImage->Width,
-                  NewImage->Height,
-                  NewImage->Width,
-                  Image->Width
-                  );
-  }
+  RawCopyAlpha (NewImage->Image.Bitmap,
+                Image->Image.Bitmap,
+                NewImage->Width,
+                NewImage->Height,
+                NewImage->Width,
+                Image->Width,
+                TRUE
+                );
   
   DrawImageArea (NewImage, 0, 0, 0, 0, Xpos, Ypos);
-  FreeImage (Image);
+  FreeImage (NewImage);
 }
 
 STATIC
@@ -1431,10 +1443,24 @@ SwitchIconSelection (
   if (Icon == NULL) {
     return;
   }
-  TakeImage (Icon, Xpos + mIconPaddingSize, Ypos + mIconPaddingSize, Icon->Width, Icon->Height);
   
-  if (Selected) {
+  RawCopy (Icon->Image.Bitmap,
+           mMenuImage->Image.Bitmap + (IsTwoRow ? mIconSpaceSize + mIconPaddingSize : mIconPaddingSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
+           Icon->Width,
+           Icon->Height,
+           Icon->Width,
+           mMenuImage->Width
+           );
+  
+  if (Selected && mSelectorUsed) {
     NewImage = CreateFilledImage (mIconSpaceSize, mIconSpaceSize, FALSE, mFontColorPixel);
+    RawCopy (NewImage->Image.Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
+             mBackgroundImage->Image.Bitmap + (Ypos + mIconPaddingSize) * mBackgroundImage->Width + (Xpos + mIconPaddingSize),
+             mIconSpaceSize - (mIconPaddingSize * 2),
+             mIconSpaceSize - (mIconPaddingSize * 2),
+             mIconSpaceSize,
+             mBackgroundImage->Width
+             );
   } else {
     NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize);
     
@@ -1447,12 +1473,18 @@ SwitchIconSelection (
              );
   }
   
-  ComposeImage (NewImage, Icon, mIconPaddingSize, mIconPaddingSize, FALSE, FALSE);
-  if (Icon != NULL) {
-    FreeImage (Icon);
-  }
+  RawCopyAlpha (NewImage->Image.Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
+                Icon->Image.Bitmap,
+                Icon->Width,
+                Icon->Height,
+                NewImage->Width,
+                Icon->Width,
+                !Selected
+                );
   
+  FreeImage (Icon);
   BltImage (NewImage, Xpos, Ypos);
+  FreeImage (NewImage);
 }
 
 STATIC
@@ -1465,7 +1497,6 @@ ClearScreen (
   
   if (FileExist (L"EFI\\OC\\Icons\\Background.png")) {
     mBackgroundImage = DecodePNGFile (L"EFI\\OC\\Icons\\Background.png");
-    mIsSolidBackground = FALSE;
   }
   
   if (mBackgroundImage != NULL && (mBackgroundImage->Width != mScreenWidth || mBackgroundImage->Height != mScreenHeight)) {
@@ -1511,6 +1542,10 @@ ClearScreen (
       mFontColorPixelAlt->Reserved = 0xff;
       FreeImage (Image);
     }
+  }
+  
+  if (FileExist (L"EFI\\OC\\Icons\\No_selector.png")) {
+    mSelectorUsed = FALSE;
   }
 }
 
@@ -1780,6 +1815,8 @@ RestoreConsoleMode (
   )
 {
   FreeImage (mBackgroundImage);
+  FreeImage (mMenuImage);
+  mMenuImage = NULL;
   ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
   mUiScale = 0;
   mTextScale = 0;
@@ -1885,11 +1922,6 @@ UiMenuMain (
                           BootEntries[DefaultEntry].IsExternal,
                           BootEntries[DefaultEntry].IsFolder
                           );
-    
-    if (mMenuImage != NULL) {
-      FreeImage (mMenuImage);
-      mMenuImage = NULL;
-    }
 
     while (TRUE) {
       KeyIndex = OcWaitForAppleKeyIndex (Context, KeyMap, 1, Context->PollAppleHotKeys, &SetDefault);
@@ -1916,6 +1948,8 @@ UiMenuMain (
         ShowAll = !ShowAll;
         DefaultEntry = mDefaultEntry;
         TimeOutSeconds = 0;
+        FreeImage (mMenuImage);
+        mMenuImage = NULL;
         break;
       } else if (KeyIndex == OC_INPUT_UP || KeyIndex == OC_INPUT_LEFT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
