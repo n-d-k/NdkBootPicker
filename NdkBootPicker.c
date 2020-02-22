@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.8"
+#define NDK_BOOTPICKER_VERSION   "0.0.9"
 
 STATIC
 BOOLEAN
@@ -108,6 +108,9 @@ mMenuImage = NULL;
 
 BOOLEAN
 mSelectorUsed = TRUE;
+
+BOOLEAN
+mAlphaEffect = TRUE;
 
 STATIC
 INTN
@@ -992,7 +995,7 @@ BltMenuImage (
                 NewImage->Height,
                 NewImage->Width,
                 Image->Width,
-                TRUE
+                mAlphaEffect
                 );
   
   DrawImageArea (NewImage, 0, 0, 0, 0, Xpos, Ypos);
@@ -1478,7 +1481,7 @@ SwitchIconSelection (
                 Icon->Height,
                 NewImage->Width,
                 Icon->Width,
-                !Selected
+                (!Selected && mAlphaEffect)
                 );
   
   FreeImage (Icon);
@@ -1543,7 +1546,9 @@ ClearScreen (
     }
   }
   
-  if (FileExist (L"EFI\\OC\\Icons\\No_selector.png")) {
+  if (FileExist (L"EFI\\OC\\Icons\\No_alpha.png")) {
+    mAlphaEffect = FALSE;
+  } else if (FileExist (L"EFI\\OC\\Icons\\No_selector.png")) {
     mSelectorUsed = FALSE;
   }
 }
