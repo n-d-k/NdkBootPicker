@@ -30,7 +30,7 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.0.9"
+#define NDK_BOOTPICKER_VERSION   "0.1.0"
 
 STATIC
 BOOLEAN
