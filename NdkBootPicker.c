@@ -482,9 +482,9 @@ RawCopyAlpha (
           && TopPtr->Blue != FirstTopPtr->Blue
           && TopPtr->Green != FirstTopPtr->Green
           && TopPtr->Reserved != FirstTopPtr->Reserved)
-          || (TopPtr->Red > 5
-          && TopPtr->Blue > 5
-          && TopPtr->Green > 5)
+          || (TopPtr->Red > 0
+          && TopPtr->Blue > 0
+          && TopPtr->Green > 0)
           ) {
         Alpha =  Faded ? mMenuFadeIntensity + 1 : TopPtr->Reserved + 1;
         InvAlpha = Faded ? 256 - mMenuFadeIntensity : 256 - TopPtr->Reserved;
