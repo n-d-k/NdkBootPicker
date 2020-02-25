@@ -2126,6 +2126,7 @@ RunBootPicker (
   //
   if (Context->PickerCommand != OcPickerDefault) {
     Status = Context->RequestPrivilege (
+                        Context,
                         Context->PrivilegeContext,
                         OcPrivilegeAuthorized
                         );
