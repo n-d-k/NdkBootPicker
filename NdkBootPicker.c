@@ -1,5 +1,5 @@
 //
-//  UiMenu.c
+//  NdkBootPicker.c
 //
 //
 //  Created by N-D-K on 1/24/20.
@@ -12,7 +12,6 @@
 #include <Protocol/UgaDraw.h>
 #include <Protocol/HiiFont.h>
 #include <Protocol/OcInterface.h>
-
 
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
@@ -30,146 +29,18 @@
 #include <Library/OcStorageLib.h>
 #include <Library/OcMiscLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.1.0"
-
-STATIC
-BOOLEAN
-mAllowSetDefault;
-
-STATIC
-BOOLEAN
-mHideAuxiliary;
-
-STATIC
-UINTN
-mDefaultEntry;
-
-/*========== Graphic UI Begin ==========*/
-
-STATIC
-EFI_GRAPHICS_OUTPUT_PROTOCOL *
-mGraphicsOutput;
-
-STATIC
-EFI_HII_FONT_PROTOCOL *
-mHiiFont;
-
-STATIC
-EFI_UGA_DRAW_PROTOCOL *
-mUgaDraw;
-
-STATIC
-INTN
-mScreenWidth;
-
-STATIC
-INTN
-mScreenHeight;
-
-STATIC
-INTN
-mFontWidth;
-
-STATIC
-INTN
-mFontHeight;
-
-STATIC
-INTN
-mTextHeight;
-
-STATIC
-INTN
-mTextScale = 0;  // not actual scale, will be set after getting screen resolution. (16 will be no scaling, 28 will be for 4k screen)
-
-STATIC
-INTN
-mUiScale = 0;
-
-STATIC
-UINTN
-mIconSpaceSize;  // Default 136 pixels space to contain icons with size 128x128.
-
-STATIC
-UINTN
-mIconPaddingSize;
-
-STATIC
-EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *
-mFileSystem = NULL;
-
-STATIC
-EFI_IMAGE_OUTPUT *
-mBackgroundImage = NULL;
-
-STATIC
-EFI_IMAGE_OUTPUT *
-mMenuImage = NULL;
-
-BOOLEAN
-mSelectorUsed = TRUE;
-
-BOOLEAN
-mAlphaEffect = TRUE;
-
-STATIC
-INTN
-mMenuFadeIntensity = 150;     // ranging from 0 to 255 0 = completely disappear, 255 = no fading.
-
-/* Colors are now customized by the optional small 16x16 pixels png color example files in Icons folder (Can be anysize only 1st pixels will be used for color setting).
-   font_color.png (Entry discription color and selection color)
-   font_color_alt.png (All other text on screen)
-   background_color.png (Background color)
-   Background.png (Wallpaper bacground instead, preferly matching with screen resolution setting.)
- 
-   Background.png will be checked first, will use it if found in Icons foler, if not found, then background_color.png will be checked,
-   if not found then 1st pixel color (top/left pixel) of icon.
- */
-
-/*=========== Default colors settings ==============*/
-
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL
-mTransparentPixel  = {0x00, 0x00, 0x00, 0x00};
-
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL
-mBlackPixel  = {0x00, 0x00, 0x00, 0xff};
-
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL
-mDarkGray = {0x76, 0x81, 0x85, 0xff};
-
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL
-mLowWhitePixel  = {0xb8, 0xbd, 0xbf, 0xff};
-
-
-// Selection and Entry's description font color
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL *
-mFontColorPixel = &mLowWhitePixel;
-
-// Date time, Version, and other color
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL *
-mFontColorPixelAlt = &mDarkGray;
-
-// Background color
-STATIC
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL *
-mBackgroundPixel = &mBlackPixel;
+#include <NdkBootPicker.h>
 
 STATIC
 VOID
 FreeImage (
-  IN EFI_IMAGE_OUTPUT    *Image
+  IN NDK_UI_IMAGE    *Image
   )
 {
   if (Image != NULL) {
-    if (Image->Image.Bitmap != NULL) {
-      FreePool (Image->Image.Bitmap);
-      Image->Image.Bitmap = NULL;
+    if (Image->Bitmap != NULL) {
+      FreePool (Image->Bitmap);
+      Image->Bitmap = NULL;
     }
     FreePool (Image);
   }
@@ -234,15 +105,15 @@ FileExist (
 }
 
 STATIC
-EFI_IMAGE_OUTPUT *
+NDK_UI_IMAGE *
 CreateImage (
   IN UINT16       Width,
   IN UINT16       Height
   )
 {
-  EFI_IMAGE_OUTPUT  *NewImage;
+  NDK_UI_IMAGE    *NewImage;
   
-  NewImage = (EFI_IMAGE_OUTPUT *) AllocateZeroPool (sizeof (EFI_IMAGE_OUTPUT));
+  NewImage = (NDK_UI_IMAGE *) AllocateZeroPool (sizeof (NDK_UI_IMAGE));
   
   if (NewImage == NULL) {
     return NULL;
@@ -253,8 +124,8 @@ CreateImage (
     return NULL;
   }
   
-  NewImage->Image.Bitmap = AllocateZeroPool (Width * Height * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-  if (NewImage->Image.Bitmap == NULL) {
+  NewImage->Bitmap = AllocateZeroPool (Width * Height * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+  if (NewImage->Bitmap == NULL) {
     FreePool (NewImage);
     return NULL;
   }
@@ -268,7 +139,7 @@ CreateImage (
 STATIC
 VOID
 RestrictImageArea (
-  IN     EFI_IMAGE_OUTPUT   *Image,
+  IN     NDK_UI_IMAGE       *Image,
   IN     INTN               AreaXpos,
   IN     INTN               AreaYpos,
   IN OUT INTN               *AreaWidth,
@@ -296,7 +167,7 @@ RestrictImageArea (
 STATIC
 VOID
 DrawImageArea (
-  IN EFI_IMAGE_OUTPUT  *Image,
+  IN NDK_UI_IMAGE      *Image,
   IN INTN              AreaXpos,
   IN INTN              AreaYpos,
   IN INTN              AreaWidth,
@@ -342,7 +213,7 @@ DrawImageArea (
   
   if (mGraphicsOutput != NULL) {
     Status = mGraphicsOutput->Blt(mGraphicsOutput,
-                                  Image->Image.Bitmap,
+                                  Image->Bitmap,
                                   EfiBltBufferToVideo,
                                   (UINTN) AreaXpos,
                                   (UINTN) AreaYpos,
@@ -355,7 +226,7 @@ DrawImageArea (
   } else {
     ASSERT (mUgaDraw != NULL);
     Status = mUgaDraw->Blt(mUgaDraw,
-                            (EFI_UGA_PIXEL *) Image->Image.Bitmap,
+                            (EFI_UGA_PIXEL *) Image->Bitmap,
                             EfiUgaBltBufferToVideo,
                             (UINTN) AreaXpos,
                             (UINTN) AreaYpos,
@@ -560,8 +431,8 @@ RawCompose (
 STATIC
 VOID
 ComposeImage (
-  IN OUT EFI_IMAGE_OUTPUT    *Image,
-  IN     EFI_IMAGE_OUTPUT    *TopImage,
+  IN OUT NDK_UI_IMAGE        *Image,
+  IN     NDK_UI_IMAGE        *TopImage,
   IN     INTN                Xpos,
   IN     INTN                Ypos,
   IN     BOOLEAN             ImageIsAlpha,
@@ -585,16 +456,16 @@ ComposeImage (
     }
     if (TopImageIsAlpha) {
       if (ImageIsAlpha) {
-        RawCompose (Image->Image.Bitmap + Ypos * Image->Width + Xpos,
-                    TopImage->Image.Bitmap,
+        RawCompose (Image->Bitmap + Ypos * Image->Width + Xpos,
+                    TopImage->Bitmap,
                     CompWidth,
                     CompHeight,
                     Image->Width,
                     TopImage->Width
                     );
       } else {
-        RawComposeOnFlat (Image->Image.Bitmap + Ypos * Image->Width + Xpos,
-                          TopImage->Image.Bitmap,
+        RawComposeOnFlat (Image->Bitmap + Ypos * Image->Width + Xpos,
+                          TopImage->Bitmap,
                           CompWidth,
                           CompHeight,
                           Image->Width,
@@ -602,8 +473,8 @@ ComposeImage (
                           );
       }
     } else {
-      RawCopy (Image->Image.Bitmap + Ypos * Image->Width + Xpos,
-               TopImage->Image.Bitmap,
+      RawCopy (Image->Bitmap + Ypos * Image->Width + Xpos,
+               TopImage->Bitmap,
                CompWidth,
                CompHeight,
                Image->Width,
@@ -616,7 +487,7 @@ ComposeImage (
 STATIC
 VOID
 FillImage (
-  IN OUT EFI_IMAGE_OUTPUT              *Image,
+  IN OUT NDK_UI_IMAGE                  *Image,
   IN     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Color,
   IN     BOOLEAN                       IsAlpha
   )
@@ -636,14 +507,14 @@ FillImage (
 
   FillColor = *Color;
 
-  PixelPtr = Image->Image.Bitmap;
+  PixelPtr = Image->Bitmap;
   for (Index = 0; Index < Image->Width * Image->Height; ++Index) {
     *PixelPtr++ = FillColor;
   }
 }
 
 STATIC
-EFI_IMAGE_OUTPUT *
+NDK_UI_IMAGE *
 CreateFilledImage (
   IN INTN                          Width,
   IN INTN                          Height,
@@ -651,7 +522,7 @@ CreateFilledImage (
   IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Color
   )
 {
-  EFI_IMAGE_OUTPUT      *NewImage;
+  NDK_UI_IMAGE      *NewImage;
   
   NewImage = CreateImage (Width, Height);
   if (NewImage == NULL) {
@@ -664,38 +535,12 @@ CreateFilledImage (
 }
 
 STATIC
-VOID
-GetGlyph (
-  VOID
-  )
-{
-  EFI_STATUS            Status;
-  EFI_IMAGE_OUTPUT      *Blt;
-  
-  Blt = NULL;
-  
-  Status = mHiiFont->GetGlyph (mHiiFont,
-                               L'Z',
-                               NULL,
-                               &Blt,
-                               NULL
-                               );
-  if (!EFI_ERROR (Status)) {
-    mFontWidth = Blt->Width;
-    mFontHeight = Blt->Height;
-    mTextHeight = mFontHeight + 1;
-    DEBUG ((DEBUG_INFO, "OCUI: Got system fontsize - w:%dxh:%d\n", Blt->Width, Blt->Height));
-    FreeImage (Blt);
-  }
-}
-
-STATIC
-EFI_IMAGE_OUTPUT *
+NDK_UI_IMAGE *
 CopyImage (
-  IN EFI_IMAGE_OUTPUT   *Image
+  IN NDK_UI_IMAGE   *Image
   )
 {
-  EFI_IMAGE_OUTPUT      *NewImage;
+  NDK_UI_IMAGE      *NewImage;
   if (Image == NULL || (Image->Width * Image->Height) == 0) {
     return NULL;
   }
@@ -705,19 +550,19 @@ CopyImage (
     return NULL;
   }
   
-  CopyMem (NewImage->Image.Bitmap, Image->Image.Bitmap, (UINTN) (Image->Width * Image->Height * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL)));
+  CopyMem (NewImage->Bitmap, Image->Bitmap, (UINTN) (Image->Width * Image->Height * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL)));
   return NewImage;
 }
 
 STATIC
-EFI_IMAGE_OUTPUT *
+NDK_UI_IMAGE *
 CopyScaledImage (
-  IN EFI_IMAGE_OUTPUT  *OldImage,
+  IN NDK_UI_IMAGE      *OldImage,
   IN INTN              Ratio
   )
 {
   BOOLEAN                             Grey = FALSE;
-  EFI_IMAGE_OUTPUT                    *NewImage;
+  NDK_UI_IMAGE                        *NewImage;
   INTN                                x, x0, x1, x2, y, y0, y1, y2;
   INTN                                NewH, NewW;
   EFI_GRAPHICS_OUTPUT_BLT_PIXEL       *Dest;
@@ -732,7 +577,7 @@ CopyScaledImage (
   if (OldImage == NULL) {
     return NULL;
   }
-  Src =  OldImage->Image.Bitmap;
+  Src =  OldImage->Bitmap;
   OldW = OldImage->Width;
 
   NewW = (OldImage->Width * Ratio) >> 4;
@@ -743,10 +588,10 @@ CopyScaledImage (
     NewImage = CopyImage (OldImage);
   } else {
     NewImage = CreateImage (NewW, NewH);
-    if (NewImage == NULL)
+    if (NewImage == NULL) {
       return NULL;
-
-    Dest = NewImage->Image.Bitmap;
+    }
+    Dest = NewImage->Bitmap;
     for (y = 0; y < NewH; y++) {
       y1 = (y << 4) / Ratio;
       y0 = ((y1 > 0) ? (y1-1) : y1) * OldW;
@@ -768,7 +613,7 @@ CopyScaledImage (
     }
   }
   if (Grey) {
-    Dest = NewImage->Image.Bitmap;
+    Dest = NewImage->Bitmap;
     for (y = 0; y < NewH; y++) {
       for (x = 0; x < NewW; x++) {
         Dest->Blue = (UINT8)((INTN)((UINTN)Dest->Blue + (UINTN)Dest->Green + (UINTN)Dest->Red) / 3);
@@ -784,7 +629,7 @@ CopyScaledImage (
 STATIC
 VOID
 TakeImage (
-  IN EFI_IMAGE_OUTPUT  *Image,
+  IN NDK_UI_IMAGE      *Image,
   IN INTN              ScreenXpos,
   IN INTN              ScreenYpos,
   IN INTN              AreaWidth,
@@ -803,7 +648,7 @@ TakeImage (
     
   if (mGraphicsOutput != NULL) {
     Status = mGraphicsOutput->Blt(mGraphicsOutput,
-                                  (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *) Image->Image.Bitmap,
+                                  (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *) Image->Bitmap,
                                   EfiBltVideoToBltBuffer,
                                   ScreenXpos,
                                   ScreenYpos,
@@ -816,7 +661,7 @@ TakeImage (
   } else {
     ASSERT (mUgaDraw != NULL);
     Status = mUgaDraw->Blt(mUgaDraw,
-                           (EFI_UGA_PIXEL *) Image->Image.Bitmap,
+                           (EFI_UGA_PIXEL *) Image->Bitmap,
                            EfiUgaVideoToBltBuffer,
                            ScreenXpos,
                            ScreenYpos,
@@ -832,11 +677,11 @@ TakeImage (
 STATIC
 VOID
 CreateMenuImage (
-  IN EFI_IMAGE_OUTPUT    *Icon,
+  IN NDK_UI_IMAGE        *Icon,
   IN UINTN               IconCount
   )
 {
-  EFI_IMAGE_OUTPUT       *NewImage;
+  NDK_UI_IMAGE           *NewImage;
   UINT16                 Width;
   UINT16                 Height;
   BOOLEAN                IsTwoRow;
@@ -894,15 +739,15 @@ CreateMenuImage (
 STATIC
 VOID
 BltImageAlpha (
-  IN EFI_IMAGE_OUTPUT              *Image,
+  IN NDK_UI_IMAGE                  *Image,
   IN INTN                          Xpos,
   IN INTN                          Ypos,
   IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BackgroundPixel,
   IN INTN                          Scale
   )
 {
-  EFI_IMAGE_OUTPUT    *CompImage;
-  EFI_IMAGE_OUTPUT    *NewImage;
+  NDK_UI_IMAGE        *CompImage;
+  NDK_UI_IMAGE        *NewImage;
   INTN                Width;
   INTN                Height;
   
@@ -932,8 +777,8 @@ BltImageAlpha (
   if (NewImage == NULL) {
     return;
   }
-  RawCopy (NewImage->Image.Bitmap,
-           mBackgroundImage->Image.Bitmap + Ypos * mBackgroundImage->Width + Xpos,
+  RawCopy (NewImage->Bitmap,
+           mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
            Width,
            Height,
            Width,
@@ -950,7 +795,7 @@ BltImageAlpha (
 STATIC
 VOID
 BltImage (
-  IN EFI_IMAGE_OUTPUT    *Image,
+  IN NDK_UI_IMAGE        *Image,
   IN INTN                Xpos,
   IN INTN                Ypos
   )
@@ -965,12 +810,12 @@ BltImage (
 STATIC
 VOID
 BltMenuImage (
-  IN EFI_IMAGE_OUTPUT    *Image,
+  IN NDK_UI_IMAGE        *Image,
   IN INTN                Xpos,
   IN INTN                Ypos
   )
 {
-  EFI_IMAGE_OUTPUT       *NewImage;
+  NDK_UI_IMAGE           *NewImage;
   
   if (Image == NULL) {
     return;
@@ -981,16 +826,16 @@ BltMenuImage (
     return;
   }
   
-  RawCopy (NewImage->Image.Bitmap,
-           mBackgroundImage->Image.Bitmap + Ypos * mBackgroundImage->Width + Xpos,
+  RawCopy (NewImage->Bitmap,
+           mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
            Image->Width,
            Image->Height,
            Image->Width,
            mBackgroundImage->Width
            );
   
-  RawCopyAlpha (NewImage->Image.Bitmap,
-                Image->Image.Bitmap,
+  RawCopyAlpha (NewImage->Bitmap,
+                Image->Bitmap,
                 NewImage->Width,
                 NewImage->Height,
                 NewImage->Width,
@@ -1003,116 +848,77 @@ BltMenuImage (
 }
 
 STATIC
-EFI_IMAGE_OUTPUT *
-CreatTextImage (
-  IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Foreground,
-  IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Background,
-  IN CHAR16                           *Buffer,
-  IN BOOLEAN                           Scale
+NDK_UI_IMAGE *
+DecodePNG (
+  IN VOID                          *Buffer,
+  IN UINT32                        BufferSize
   )
 {
-  EFI_STATUS                          Status;
-  EFI_IMAGE_OUTPUT                    *Blt;
-  EFI_IMAGE_OUTPUT                    *ScaledBlt;
-  EFI_FONT_DISPLAY_INFO               FontDisplayInfo;
-  EFI_HII_ROW_INFO                    *RowInfoArray;
-  UINTN                               RowInfoArraySize;
+  EFI_STATUS                       Status;
+  NDK_UI_IMAGE                     *NewImage;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Pixel;
+  VOID                             *Data;
+  UINT32                           Width;
+  UINT32                           Height;
+  UINT8                            *DataWalker;
+  UINTN                            X;
+  UINTN                            Y;
+  BOOLEAN                          IsAlpha;
   
-  RowInfoArray  = NULL;
-  ScaledBlt = NULL;
-
-  Blt = (EFI_IMAGE_OUTPUT *) AllocateZeroPool (sizeof (EFI_IMAGE_OUTPUT));
-  if (Blt == NULL) {
-    DEBUG ((DEBUG_INFO, "OCUI: Failed to allocate memory pool.\n"));
+  if (Buffer == NULL) {
     return NULL;
   }
   
-  Blt->Width = StrLen (Buffer) * mFontWidth;
-  Blt->Height = mFontHeight;
-  
-  Blt->Image.Bitmap = AllocateZeroPool (Blt->Width * Blt->Height * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-  
-  if (Blt->Image.Bitmap == NULL) {
-    DEBUG ((DEBUG_INFO, "OCUI: Failed to allocate memory pool for Bitmap.\n"));
-    FreeImage (Blt);
+  Status = DecodePng (
+               Buffer,
+               BufferSize,
+               &Data,
+               &Width,
+               &Height,
+               &IsAlpha
+              );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "OCUI: DecodePNG...%r\n", Status));
+    if (Buffer != NULL) {
+      FreePool (Buffer);
+    }
+    return NULL;
+  }
+    
+  NewImage = CreateImage ((INTN) Width, (INTN) Height);
+  if (NewImage == NULL) {
+    if (Buffer != NULL) {
+      FreePool (Buffer);
+    }
     return NULL;
   }
   
-  ZeroMem (&FontDisplayInfo, sizeof (EFI_FONT_DISPLAY_INFO));
-  CopyMem (&FontDisplayInfo.ForegroundColor, Foreground, sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-  CopyMem (&FontDisplayInfo.BackgroundColor, Background, sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-  
-  Status = mHiiFont->StringToImage (
-                          mHiiFont,
-                          EFI_HII_IGNORE_IF_NO_GLYPH | EFI_HII_OUT_FLAG_CLIP |
-                          EFI_HII_OUT_FLAG_CLIP_CLEAN_X | EFI_HII_OUT_FLAG_CLIP_CLEAN_Y |
-                          EFI_HII_IGNORE_LINE_BREAK,
-                          Buffer,
-                          &FontDisplayInfo,
-                          &Blt,
-                          0,
-                          0,
-                          &RowInfoArray,
-                          &RowInfoArraySize,
-                          NULL
-                          );
-  
-  if (!EFI_ERROR (Status) && !Scale) {
-    if (RowInfoArray != NULL) {
-      FreePool (RowInfoArray);
-    }
-    return Blt;
-  }
-  
-  if (!EFI_ERROR (Status)) {
-    ScaledBlt = CopyScaledImage (Blt, mTextScale);
-    if (ScaledBlt == NULL) {
-      DEBUG ((DEBUG_INFO, "OCUI: Failed to scale image!\n"));
-      if (RowInfoArray != NULL) {
-        FreePool (RowInfoArray);
-      }
-      FreeImage (Blt);
+  Pixel = (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *) NewImage->Bitmap;
+  DataWalker = (UINT8 *) Data;
+  for (Y = 0; Y < NewImage->Height; Y++) {
+    for (X = 0; X < NewImage->Width; X++) {
+      Pixel->Red = *DataWalker++;
+      Pixel->Green = *DataWalker++;
+      Pixel->Blue = *DataWalker++;
+      Pixel->Reserved = 255 - *DataWalker++;
+      Pixel++;
     }
   }
   
-  if (RowInfoArray != NULL) {
-    FreePool (RowInfoArray);
+  if (Buffer != NULL) {
+    FreePool (Buffer);
   }
-    
-  FreeImage (Blt);
-    
-  return ScaledBlt;
+  
+  if (Data != NULL) {
+    FreePool (Data);
+  }
+  
+  NewImage->IsAlpha = IsAlpha;
+  return NewImage;
 }
 
 STATIC
-VOID
-PrintTextGraphicXY (
-  IN CHAR16                           *String,
-  IN INTN                             Xpos,
-  IN INTN                             Ypos,
-  IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *FontColor
-  )
-{
-  EFI_IMAGE_OUTPUT                    *TextImage;
-
-  TextImage = CreatTextImage (FontColor, &mTransparentPixel, String, TRUE);
-  if (TextImage == NULL) {
-    return;
-  }
-  
-  if ((Xpos + TextImage->Width + 8) > mScreenWidth) {
-    Xpos = mScreenWidth - (TextImage->Width + 8);
-  }
-  
-  if ((Ypos + TextImage->Height + 5) > mScreenHeight) {
-    Ypos = mScreenHeight - (TextImage->Height + 5);
-  }
-  
-  BltImageAlpha (TextImage, Xpos, Ypos, &mTransparentPixel, 16);
-}
-
-STATIC
-EFI_IMAGE_OUTPUT *
+NDK_UI_IMAGE *
 DecodePNGFile (
   IN CHAR16                        *FilePath
   )
@@ -1121,14 +927,6 @@ DecodePNGFile (
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL  *FileSystem;
   VOID                             *Buffer;
   UINT32                           BufferSize;
-  EFI_IMAGE_OUTPUT                 *NewImage;
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Pixel;
-  VOID                             *Data;
-  UINT32                           Width;
-  UINT32                           Height;
-  UINT8                            *DataWalker;
-  UINTN                            X;
-  UINTN                            Y;
   EFI_HANDLE                       *Handles;
   UINTN                            HandleCount;
   UINTN                            Index;
@@ -1172,55 +970,12 @@ DecodePNGFile (
   
   if (Buffer == NULL) {
     DEBUG ((DEBUG_ERROR, "OCUI: Failed to locate %s file\n", FilePath));
-    return Buffer;
-  }
-  
-  Status = DecodePng (
-               Buffer,
-               BufferSize,
-               &Data,
-               &Width,
-               &Height,
-               NULL
-              );
-  if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_INFO, "OCUI: DecodePNG...%r\n", Status));
-    if (Buffer != NULL) {
-      FreePool (Buffer);
-    }
     return NULL;
   }
-    
-  NewImage = CreateImage ((INTN) Width, (INTN) Height);
-  if (NewImage == NULL) {
-    if (Buffer != NULL) {
-      FreePool (Buffer);
-    }
-    return NULL;
-  }
-  
-  Pixel = (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *) NewImage->Image.Bitmap;
-  DataWalker = (UINT8 *) Data;
-  for (Y = 0; Y < NewImage->Height; Y++) {
-    for (X = 0; X < NewImage->Width; X++) {
-      Pixel->Red = *DataWalker++;
-      Pixel->Green = *DataWalker++;
-      Pixel->Blue = *DataWalker++;
-      Pixel->Reserved = 255 - *DataWalker++;
-      Pixel++;
-    }
-  }
-  if (Buffer != NULL) {
-    FreePool (Buffer);
-  }
-  
-  if (Data != NULL) {
-    FreePool (Data);
-  }
-  
-  return NewImage;
+  return DecodePNG (Buffer, BufferSize);
 }
 
+STATIC
 VOID
 TakeScreenShot (
   IN CHAR16              *FilePath
@@ -1229,7 +984,7 @@ TakeScreenShot (
   EFI_STATUS              Status;
   EFI_FILE_PROTOCOL       *Fs;
   EFI_TIME                Date;
-  EFI_IMAGE_OUTPUT        *Image;
+  NDK_UI_IMAGE            *Image;
   EFI_UGA_PIXEL           *ImagePNG;
   VOID                    *Buffer;
   UINTN                   BufferSize;
@@ -1265,7 +1020,7 @@ TakeScreenShot (
     
   TakeImage (Image, 0, 0, mScreenWidth, mScreenHeight);
   
-  ImagePNG = (EFI_UGA_PIXEL *) Image->Image.Bitmap;
+  ImagePNG = (EFI_UGA_PIXEL *) Image->Bitmap;
   ImageSize = Image->Width * Image->Height;
   
   // Convert BGR to RGBA with Alpha set to 0xFF
@@ -1317,9 +1072,9 @@ CreateIcon (
   )
 {
   CHAR16                 *FilePath;
-  EFI_IMAGE_OUTPUT       *Icon;
-  EFI_IMAGE_OUTPUT       *ScaledImage;
-  EFI_IMAGE_OUTPUT       *TmpImage;
+  NDK_UI_IMAGE           *Icon;
+  NDK_UI_IMAGE           *ScaledImage;
+  NDK_UI_IMAGE           *TmpImage;
   
   Icon = NULL;
   ScaledImage = NULL;
@@ -1399,8 +1154,8 @@ SwitchIconSelection (
   IN BOOLEAN             Selected
   )
 {
-  EFI_IMAGE_OUTPUT       *NewImage;
-  EFI_IMAGE_OUTPUT       *Icon;
+  NDK_UI_IMAGE           *NewImage;
+  NDK_UI_IMAGE           *Icon;
   BOOLEAN                IsTwoRow;
   INTN                   Xpos;
   INTN                   Ypos;
@@ -1446,8 +1201,8 @@ SwitchIconSelection (
     return;
   }
   
-  RawCopy (Icon->Image.Bitmap,
-           mMenuImage->Image.Bitmap + ((IconIndex <= IconsPerRow) ? mIconPaddingSize : mIconPaddingSize + mIconSpaceSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
+  RawCopy (Icon->Bitmap,
+           mMenuImage->Bitmap + ((IconIndex <= IconsPerRow) ? mIconPaddingSize : mIconPaddingSize + mIconSpaceSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
            Icon->Width,
            Icon->Height,
            Icon->Width,
@@ -1456,8 +1211,8 @@ SwitchIconSelection (
   
   if (Selected && mSelectorUsed) {
     NewImage = CreateFilledImage (mIconSpaceSize, mIconSpaceSize, FALSE, mFontColorPixel);
-    RawCopy (NewImage->Image.Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
-             mBackgroundImage->Image.Bitmap + (Ypos + mIconPaddingSize) * mBackgroundImage->Width + (Xpos + mIconPaddingSize),
+    RawCopy (NewImage->Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
+             mBackgroundImage->Bitmap + (Ypos + mIconPaddingSize) * mBackgroundImage->Width + (Xpos + mIconPaddingSize),
              mIconSpaceSize - (mIconPaddingSize * 2),
              mIconSpaceSize - (mIconPaddingSize * 2),
              mIconSpaceSize,
@@ -1466,8 +1221,8 @@ SwitchIconSelection (
   } else {
     NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize);
     
-    RawCopy (NewImage->Image.Bitmap,
-             mBackgroundImage->Image.Bitmap + Ypos * mBackgroundImage->Width + Xpos,
+    RawCopy (NewImage->Bitmap,
+             mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
              mIconSpaceSize,
              mIconSpaceSize,
              mIconSpaceSize,
@@ -1475,8 +1230,8 @@ SwitchIconSelection (
              );
   }
   
-  RawCopyAlpha (NewImage->Image.Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
-                Icon->Image.Bitmap,
+  RawCopyAlpha (NewImage->Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
+                Icon->Bitmap,
                 Icon->Width,
                 Icon->Height,
                 NewImage->Width,
@@ -1495,7 +1250,7 @@ ClearScreen (
   IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL  *Color
   )
 {
-  EFI_IMAGE_OUTPUT                  *Image;
+  NDK_UI_IMAGE                  *Image;
   
   if (FileExist (L"EFI\\OC\\Icons\\Background.png")) {
     mBackgroundImage = DecodePNGFile (L"EFI\\OC\\Icons\\Background.png");
@@ -1510,12 +1265,12 @@ ClearScreen (
     if (FileExist (L"EFI\\OC\\Icons\\background_color.png")) {
       Image = DecodePNGFile (L"EFI\\OC\\Icons\\background_color.png");
       if (Image != NULL) {
-        CopyMem (mBackgroundPixel, &Image->Image.Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+        CopyMem (mBackgroundPixel, &Image->Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
         mBackgroundPixel->Reserved = 0xff;
       } else {
         Image = DecodePNGFile (L"EFI\\OC\\Icons\\os_mac.icns");
         if (Image != NULL) {
-          CopyMem (mBackgroundPixel, &Image->Image.Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+          CopyMem (mBackgroundPixel, &Image->Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
           mBackgroundPixel->Reserved = 0xff;
         }
       }
@@ -1531,17 +1286,8 @@ ClearScreen (
   if (FileExist (L"EFI\\OC\\Icons\\font_color.png")) {
     Image = DecodePNGFile (L"EFI\\OC\\Icons\\font_color.png");
     if (Image != NULL) {
-      CopyMem (mFontColorPixel, &Image->Image.Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+      CopyMem (mFontColorPixel, &Image->Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
       mFontColorPixel->Reserved = 0xff;
-      FreeImage (Image);
-    }
-  }
-  
-  if (FileExist (L"EFI\\OC\\Icons\\font_color_alt.png")) {
-    Image = DecodePNGFile (L"EFI\\OC\\Icons\\font_color_alt.png");
-    if (Image != NULL) {
-      CopyMem (mFontColorPixelAlt, &Image->Image.Bitmap[0], sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
-      mFontColorPixelAlt->Reserved = 0xff;
       FreeImage (Image);
     }
   }
@@ -1563,8 +1309,8 @@ ClearScreenArea (
   IN INTN                           Height
   )
 {
-  EFI_IMAGE_OUTPUT                  *Image;
-  EFI_IMAGE_OUTPUT                  *NewImage;
+  NDK_UI_IMAGE                      *Image;
+  NDK_UI_IMAGE                      *NewImage;
   
   Image = CreateFilledImage (Width, Height, (mBackgroundImage != NULL), Color);
   if (mBackgroundImage == NULL) {
@@ -1577,8 +1323,8 @@ ClearScreenArea (
   if (NewImage == NULL) {
     return;
   }
-  RawCopy (NewImage->Image.Bitmap,
-           mBackgroundImage->Image.Bitmap + Ypos * mBackgroundImage->Width + Xpos,
+  RawCopy (NewImage->Bitmap,
+           mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
            Width,
            Height,
            Width,
@@ -1635,8 +1381,8 @@ InitScreen (
   }
   DEBUG ((DEBUG_INFO, "OCUI: Initialize Graphic Screen...%r\n", Status));
   
-  mTextScale = (mTextScale == 0 && mScreenHeight >= 2160) ? 28 : 16;
-  if (mUiScale == 0 && mScreenHeight >= 2160) {
+  mTextScale = (mTextScale == 0 && mScreenHeight >= 2160 && !(FileExist (L"EFI\\OC\\Icons\\No_text_scaling.png"))) ? 28 : 16;
+  if (mUiScale == 0 && mScreenHeight >= 2160 && !(FileExist (L"EFI\\OC\\Icons\\No_icon_scaling.png"))) {
     mUiScale = 28;
     mIconPaddingSize = 5;
     mIconSpaceSize = 234;
@@ -1649,26 +1395,345 @@ InitScreen (
     mIconPaddingSize = 4;
     mIconSpaceSize = 136;
   }
+}
+
+//
+// Text rendering
+//
+STATIC
+NDK_UI_IMAGE *
+LoadFontImage (
+  IN INTN                       Cols,
+  IN INTN                       Rows
+  )
+{
+  NDK_UI_IMAGE                  *NewImage;
+  NDK_UI_IMAGE                  *NewFontImage;
+  INTN                          ImageWidth;
+  INTN                          ImageHeight;
+  INTN                          X;
+  INTN                          Y;
+  INTN                          Ypos;
+  INTN                          J;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *PixelPtr;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL FirstPixel;
   
-  Status = gBS->LocateProtocol (&gEfiHiiFontProtocolGuid, NULL, (VOID **) &mHiiFont);
+  NewImage = NULL;
   
-  if (EFI_ERROR (Status)) {
-    Status = gBS->InstallMultipleProtocolInterfaces (
-                    &Handle,
-                    &gEfiHiiFontProtocolGuid,
-                    &mHiiFont,
-                    NULL
-                    );
-    DEBUG ((DEBUG_INFO, "OCUI: No HiiFont found, installing...%r\n", Status));
-    if (EFI_ERROR (Status)) {
-      mHiiFont = NULL;
+  if (FileExist (L"EFI\\OC\\Icons\\font.png")) {
+    NewImage = DecodePNGFile (L"EFI\\OC\\Icons\\font.png");
+  } else {
+    NewImage = DecodePNG (ACCESS_DATA(font_data), ACCESS_SIZE(font_data));
+  }
+  
+  ImageWidth = NewImage->Width;
+  ImageHeight = NewImage->Height;
+  PixelPtr = NewImage->Bitmap;
+  NewFontImage = CreateImage (ImageWidth * Rows, ImageHeight / Rows); // need to be Alpha
+  
+  if (NewFontImage == NULL) {
+    if (NewImage != NULL) {
+      FreeImage (NewImage);
+    }
+    return NULL;
+  }
+  
+  mFontWidth = ImageWidth / Cols;
+  mFontHeight = ImageHeight / Rows;
+  mTextHeight = mFontHeight + 1;
+  FirstPixel = *PixelPtr;
+  for (Y = 0; Y < Rows; ++Y) {
+    for (J = 0; J < mFontHeight; J++) {
+      Ypos = ((J * Rows) + Y) * ImageWidth;
+      for (X = 0; X < ImageWidth; ++X) {
+        if ((PixelPtr->Blue == FirstPixel.Blue)
+            && (PixelPtr->Green == FirstPixel.Green)
+            && (PixelPtr->Red == FirstPixel.Red)) {
+          PixelPtr->Reserved = 0;
+        } else if (mDarkMode) {
+          *PixelPtr = *mFontColorPixel;
+        }
+        NewFontImage->Bitmap[Ypos + X] = *PixelPtr++;
+      }
     }
   }
   
-  DEBUG ((DEBUG_INFO, "OCUI: Initialize HiiFont...%r\n", Status));
+  FreeImage (NewImage);
   
-  GetGlyph ();
+  return NewFontImage;
 }
+
+STATIC
+VOID
+PrepareFont (
+  VOID
+  )
+{
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *PixelPtr;
+  INTN                          Width;
+  INTN                          Height;
+
+  mTextHeight = mFontHeight + 1;
+
+  if (mFontImage != NULL) {
+    FreeImage (mFontImage);
+    mFontImage = NULL;
+  }
+  
+  mFontImage = LoadFontImage (16, 16);
+  
+  if (mFontImage != NULL) {
+    if (!mDarkMode) {
+      //invert the font for DarkMode
+      PixelPtr = mFontImage->Bitmap;
+      for (Height = 0; Height < mFontImage->Height; Height++){
+        for (Width = 0; Width < mFontImage->Width; Width++, PixelPtr++){
+          PixelPtr->Blue  ^= 0xFF;
+          PixelPtr->Green ^= 0xFF;
+          PixelPtr->Red   ^= 0xFF;
+        }
+      }
+    }
+  } else {
+    DEBUG ((DEBUG_INFO, "OCUI: Failed to load font file...\n"));
+  }
+}
+
+
+STATIC
+BOOLEAN
+EmptyPix (
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Ptr,
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *FirstPixel
+  )
+{
+  //compare with first pixel of the array top-left point [0][0]
+   return ((Ptr->Red >= FirstPixel->Red - (FirstPixel->Red >> 2)) && (Ptr->Red <= FirstPixel->Red + (FirstPixel->Red >> 2)) &&
+           (Ptr->Green >= FirstPixel->Green - (FirstPixel->Green >> 2)) && (Ptr->Green <= FirstPixel->Green + (FirstPixel->Green >> 2)) &&
+           (Ptr->Blue >= FirstPixel->Blue - (FirstPixel->Blue >> 2)) && (Ptr->Blue <= FirstPixel->Blue + (FirstPixel->Blue >> 2)) &&
+           (Ptr->Reserved == FirstPixel->Reserved));
+}
+
+STATIC
+INTN
+GetEmpty (
+  IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Ptr,
+  IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL *FirstPixel,
+  IN INTN                          MaxWidth,
+  IN INTN                          Step,
+  IN INTN                          Row
+  )
+{
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Ptr0;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    *Ptr1;
+  INTN                             Index;
+  INTN                             J;
+  INTN                             M;
+  
+
+  Ptr1 = (Step > 0) ? Ptr : Ptr - 1;
+  M = MaxWidth;
+  for (J = 0; J < mFontHeight; ++J) {
+    Ptr0 = Ptr1 + J * Row;
+    for (Index = 0; Index < MaxWidth; ++Index) {
+      if (!EmptyPix (Ptr0, FirstPixel)) {
+        break;
+      }
+      Ptr0 += Step;
+    }
+    M = (Index > M) ? M : Index;
+  }
+  return M;
+}
+
+STATIC
+INTN
+RenderText (
+  IN     CHAR16                 *Text,
+  IN OUT NDK_UI_IMAGE           *CompImage,
+  IN     INTN                   Xpos,
+  IN     INTN                   Ypos,
+  IN     INTN                   Cursor
+  )
+{
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BufferPtr;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *FontPixelData;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *FirstPixelBuf;
+  INTN                          BufferLineWidth;
+  INTN                          BufferLineOffset;
+  INTN                          FontLineOffset;
+  INTN                          TextLength;
+  INTN                          Index;
+  UINT16                        C;
+  UINT16                        C0;
+  UINT16                        C1;
+  UINTN                         Shift;
+  UINTN                         LeftSpace;
+  UINTN                         RightSpace;
+  INTN                          RealWidth;
+  INTN                          ScaledWidth;
+  
+  ScaledWidth = (INTN) CHAR_WIDTH;
+  Shift       = 0;
+  RealWidth   = 0;
+  
+  TextLength = StrLen (Text);
+  if (mFontImage == NULL) {
+    PrepareFont();
+  }
+  
+  BufferPtr = CompImage->Bitmap;
+  BufferLineOffset = CompImage->Width;
+  BufferLineWidth = BufferLineOffset - Xpos;
+  BufferPtr += Xpos + Ypos * BufferLineOffset;
+  FirstPixelBuf = BufferPtr;
+  FontPixelData = mFontImage->Bitmap;
+  FontLineOffset = mFontImage->Width;
+
+  if (ScaledWidth < mFontWidth) {
+    Shift = (mFontWidth - ScaledWidth) >> 1;
+  }
+  C0 = 0;
+  RealWidth = ScaledWidth;
+  for (Index = 0; Index < TextLength; ++Index) {
+    C = Text[Index];
+    C1 = (((C >= 0xC0) ? (C - (0xC0 - 0xC0)) : C) & 0xff);
+    C = C1;
+
+    if (mProportional) {
+      if (C0 <= 0x20) {
+        LeftSpace = 2;
+      } else {
+        LeftSpace = GetEmpty (BufferPtr, FirstPixelBuf, ScaledWidth, -1, BufferLineOffset);
+      }
+      if (C <= 0x20) {
+        RightSpace = 1;
+        RealWidth = (ScaledWidth >> 1) + 1;
+      } else {
+        RightSpace = GetEmpty (FontPixelData + C * mFontWidth, FontPixelData, mFontWidth, 1, FontLineOffset);
+        if (RightSpace >= ScaledWidth + Shift) {
+          RightSpace = 0;
+        }
+        RealWidth = mFontWidth - RightSpace;
+      }
+
+    } else {
+      LeftSpace = 2;
+      RightSpace = Shift;
+    }
+    C0 = C;
+    if ((UINTN) BufferPtr + RealWidth * 4 > (UINTN) FirstPixelBuf + BufferLineWidth * 4) {
+      break;
+    }
+    RawCompose (BufferPtr - LeftSpace + 2, FontPixelData + C * mFontWidth + RightSpace,
+                  RealWidth,
+                  mFontHeight,
+                  BufferLineOffset,
+                  FontLineOffset
+                  );
+    
+    if (Index == Cursor) {
+      C = 0x5F;
+      RawCompose (BufferPtr - LeftSpace + 2, FontPixelData + C * mFontWidth + RightSpace,
+                    RealWidth, mFontHeight,
+                    BufferLineOffset, FontLineOffset
+                    );
+    }
+    BufferPtr += RealWidth - LeftSpace + 2;
+  }
+  return ((INTN) BufferPtr - (INTN) FirstPixelBuf) / sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL);
+}
+
+NDK_UI_IMAGE *
+CreateTextImage (
+  IN CHAR16         *String
+  )
+{
+  NDK_UI_IMAGE      *Image;
+  NDK_UI_IMAGE      *TmpImage;
+  NDK_UI_IMAGE      *ScaledTextImage;
+  INTN              Width;
+  INTN              TextWidth;
+  
+  TextWidth = 0;
+  
+  if (String == NULL) {
+    return NULL;
+  }
+  
+  Width = StrLen (String) * mFontWidth;
+  Image = CreateFilledImage (Width, mTextHeight, TRUE, &mTransparentPixel);
+  if (Image != NULL) {
+    TextWidth = RenderText (String, Image, 0, 0, 0xFFFF);
+  }
+  
+  TmpImage = CreateImage (TextWidth, mFontHeight);
+  RawCopy (TmpImage->Bitmap,
+           Image->Bitmap + 1 * Image->Width + 1,
+           TmpImage->Width,
+           TmpImage->Height,
+           TmpImage->Width,
+           Image->Width
+           );
+  
+  FreeImage (Image);
+  ScaledTextImage = CopyScaledImage (TmpImage, mTextScale);
+    
+  if (ScaledTextImage == NULL) {
+    DEBUG ((DEBUG_INFO, "OCUI: Failed to scale image!\n"));
+    FreeImage (TmpImage);
+  }
+  
+  return ScaledTextImage;
+}
+
+STATIC
+VOID
+PrintTextGraphicXY (
+  IN CHAR16                           *String,
+  IN INTN                             Xpos,
+  IN INTN                             Ypos,
+  IN BOOLEAN                          Faded
+  )
+{
+  NDK_UI_IMAGE                        *TextImage;
+  NDK_UI_IMAGE                        *NewImage;
+
+  NewImage = NULL;
+  
+  TextImage = CreateTextImage (String);
+  if (TextImage == NULL) {
+    return;
+  }
+  
+  if ((Xpos + TextImage->Width + 8) > mScreenWidth) {
+    Xpos = mScreenWidth - (TextImage->Width + 8);
+  }
+  
+  if ((Ypos + TextImage->Height + 5) > mScreenHeight) {
+    Ypos = mScreenHeight - (TextImage->Height + 5);
+  }
+  
+  if (Faded) {
+    NewImage = CreateImage (TextImage->Width, TextImage->Height);
+    RawCopyAlpha (NewImage->Bitmap,
+                  TextImage->Bitmap,
+                  NewImage->Width,
+                  NewImage->Height,
+                  NewImage->Width,
+                  TextImage->Width,
+                  TRUE
+                  );
+    FreeImage (TextImage);
+    BltImageAlpha (NewImage, Xpos, Ypos, &mTransparentPixel, 16);
+  } else {
+    BltImageAlpha (TextImage, Xpos, Ypos, &mTransparentPixel, 16);
+  }
+}
+
+//
+//     Text rendering end
+//
 
 STATIC
 VOID
@@ -1678,8 +1743,8 @@ PrintDateTime (
 {
   EFI_STATUS         Status;
   EFI_TIME           DateTime;
-  CHAR16             DateStr[11];
-  CHAR16             TimeStr[11];
+  CHAR16             DateStr[12];
+  CHAR16             TimeStr[12];
   UINTN              Hour;
   CHAR16             *Str;
   
@@ -1693,10 +1758,11 @@ PrintDateTime (
     if (Hour > 12) {
       Hour = Hour - 12;
     }
-    UnicodeSPrint (DateStr, sizeof (DateStr), L"%02u/%02u/%04u", DateTime.Month, DateTime.Day, DateTime.Year);
+    ClearScreenArea (&mTransparentPixel, 0, 0, mScreenWidth, mFontHeight * 5);
+    UnicodeSPrint (DateStr, sizeof (DateStr), L" %02u/%02u/%04u", DateTime.Month, DateTime.Day, DateTime.Year);
     UnicodeSPrint (TimeStr, sizeof (TimeStr), L"%02u:%02u:%02u%s", Hour, DateTime.Minute, DateTime.Second, Str);
-    PrintTextGraphicXY (DateStr, mScreenWidth - ((StrLen(DateStr) * mFontWidth) + 10), 5, mFontColorPixelAlt);
-    PrintTextGraphicXY (TimeStr, mScreenWidth - ((StrLen(DateStr) * mFontWidth) + 10), (mTextScale == 16) ? (mFontHeight + 5 + 2) : ((mFontHeight * 2) + 5 + 2), mFontColorPixelAlt);
+    PrintTextGraphicXY (DateStr, mScreenWidth - ((StrLen(DateStr) * mFontWidth) + 15), 5, TRUE);
+    PrintTextGraphicXY (TimeStr, mScreenWidth - ((StrLen(DateStr) * mFontWidth) + 10), (mTextScale == 16) ? (mFontHeight + 5 + 2) : ((mFontHeight * 2) + 5 + 2), TRUE);
   } else {
     ClearScreenArea (&mTransparentPixel, 0, 0, mScreenWidth, mFontHeight * 5);
   }
@@ -1717,7 +1783,7 @@ PrintOcVersion (
   
   NewString = AsciiStrCopyToUnicode (String, 0);
   if (String != NULL && ShowAll) {
-    PrintTextGraphicXY (NewString, mScreenWidth - ((StrLen(NewString) * mFontWidth) + 10), mScreenHeight - (mFontHeight + 5), mFontColorPixelAlt);
+    PrintTextGraphicXY (NewString, mScreenWidth - ((StrLen(NewString) * mFontWidth) + 10), mScreenHeight - (mFontHeight + 5), TRUE);
   } else {
     ClearScreenArea (&mTransparentPixel,
                        mScreenWidth - ((StrLen(NewString) * mFontWidth) * 2),
@@ -1731,11 +1797,11 @@ PrintOcVersion (
 STATIC
 BOOLEAN
 PrintTimeOutMessage (
-  IN UINTN           Timeout
+  IN UINTN             Timeout
   )
 {
-  EFI_IMAGE_OUTPUT     *TextImage;
-  EFI_IMAGE_OUTPUT     *NewImage;
+  NDK_UI_IMAGE         *TextImage;
+  NDK_UI_IMAGE         *NewImage;
   CHAR16               String[52];
   
   TextImage = NULL;
@@ -1743,19 +1809,26 @@ PrintTimeOutMessage (
   
   if (Timeout > 0) {
     UnicodeSPrint (String, sizeof (String), L"%s %02u %s.", L"The default boot selection will start in", Timeout, L"seconds"); //52
-    TextImage = CreatTextImage (mFontColorPixelAlt, &mTransparentPixel, String, TRUE);
+    TextImage = CreateTextImage (String);
     if (TextImage == NULL) {
       return !(Timeout > 0);
     }
-    NewImage = CreateFilledImage (mScreenWidth, TextImage->Height, TRUE, &mTransparentPixel);
+    NewImage = CreateImage (TextImage->Width, TextImage->Height);
     if (NewImage == NULL) {
       FreeImage (TextImage);
       return !(Timeout > 0);
     }
-    ComposeImage (NewImage, TextImage, (NewImage->Width - TextImage->Width) / 2, 0, TRUE, TRUE);
-    if (TextImage != NULL) {
-      FreeImage (TextImage);
-    }
+    
+    RawCopyAlpha (NewImage->Bitmap,
+                  TextImage->Bitmap,
+                  NewImage->Width,
+                  NewImage->Height,
+                  NewImage->Width,
+                  TextImage->Width,
+                  TRUE
+                  );
+    
+    FreeImage (TextImage);
     BltImageAlpha (NewImage, (mScreenWidth - NewImage->Width) / 2, (mScreenHeight / 4) * 3, &mTransparentPixel, 16);
   } else {
     ClearScreenArea (&mTransparentPixel, 0, ((mScreenHeight / 4) * 3) - 4, mScreenWidth, mFontHeight * 2);
@@ -1765,7 +1838,7 @@ PrintTimeOutMessage (
 
 STATIC
 VOID
-PrintTextDesrciption (
+PrintTextDescription (
   IN UINTN        MaxStrWidth,
   IN UINTN        Selected,
   IN CHAR16       *Name,
@@ -1773,10 +1846,10 @@ PrintTextDesrciption (
   IN BOOLEAN      Dmg
   )
 {
-  EFI_IMAGE_OUTPUT                   *TextImage;
-  EFI_IMAGE_OUTPUT                   *NewImage;
-  CHAR16                             Code[3];
-  CHAR16                             String[MaxStrWidth + 1];
+  NDK_UI_IMAGE    *TextImage;
+  NDK_UI_IMAGE    *NewImage;
+  CHAR16          Code[3];
+  CHAR16          String[MaxStrWidth + 1];
   
   Code[0] = 0x20;
   Code[1] = OC_INPUT_STR[Selected];
@@ -1790,7 +1863,7 @@ PrintTextDesrciption (
                  Dmg ? L" (dmg)" : L""
                  );
   
-  TextImage = CreatTextImage (mFontColorPixel, &mTransparentPixel, String, TRUE);
+  TextImage = CreateTextImage (String);
   if (TextImage == NULL) {
     return;
   }
@@ -1821,6 +1894,8 @@ RestoreConsoleMode (
   FreeImage (mBackgroundImage);
   FreeImage (mMenuImage);
   mMenuImage = NULL;
+  FreeImage (mFontImage);
+  mFontImage = NULL;
   ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
   mUiScale = 0;
   mTextScale = 0;
@@ -1919,7 +1994,7 @@ UiMenuMain (
     ClearScreenArea (&mTransparentPixel, 0, (mScreenHeight / 2) - mIconSpaceSize, mScreenWidth, mIconSpaceSize * 2);
     BltMenuImage (mMenuImage, (mScreenWidth - mMenuImage->Width) / 2, (mScreenHeight / 2) - mIconSpaceSize);
     SwitchIconSelection (VisibleIndex, Selected, TRUE);
-    PrintTextDesrciption (MaxStrWidth,
+    PrintTextDescription (MaxStrWidth,
                           Selected,
                           BootEntries[DefaultEntry].Name,
                           BootEntries[DefaultEntry].IsExternal,
@@ -1959,7 +2034,7 @@ UiMenuMain (
         DefaultEntry = Selected > 0 ? VisibleList[Selected - 1] : VisibleList[VisibleIndex - 1];
         Selected = Selected > 0 ? --Selected : VisibleIndex - 1;
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
-        PrintTextDesrciption (MaxStrWidth,
+        PrintTextDescription (MaxStrWidth,
                               Selected,
                               BootEntries[DefaultEntry].Name,
                               BootEntries[DefaultEntry].IsExternal,
@@ -1971,7 +2046,7 @@ UiMenuMain (
         DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : 0;
         Selected = Selected < (VisibleIndex - 1) ? ++Selected : 0;
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
-        PrintTextDesrciption (MaxStrWidth,
+        PrintTextDescription (MaxStrWidth,
                               Selected,
                               BootEntries[DefaultEntry].Name,
                               BootEntries[DefaultEntry].IsExternal,

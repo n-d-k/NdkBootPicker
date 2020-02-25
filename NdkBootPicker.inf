@@ -35,6 +35,7 @@
 #
 
 [Sources]
+  NdkBootPicker.h
   NdkBootPicker.c
 
 [Packages]

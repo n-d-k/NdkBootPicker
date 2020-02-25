@@ -39,7 +39,7 @@ package() {
     exit 1
   fi
   
-  local ver=$(cat NdkBootPicker.c | grep NDK_BOOTPICKER_VERSION | sed 's/.*"\(.*\)".*/\1/' | grep -E '^[0-9.]+$')
+  local ver=$(cat NdkBootPicker.h | grep NDK_BOOTPICKER_VERSION | sed 's/.*"\(.*\)".*/\1/' | grep -E '^[0-9.]+$')
   if [ "$ver" = "" ]; then
     echo "Invalid version $ver"
   fi
