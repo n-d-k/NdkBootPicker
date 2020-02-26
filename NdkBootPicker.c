@@ -1905,6 +1905,31 @@ RestoreConsoleMode (
   gST->ConOut->SetCursorPosition (gST->ConOut, 0, 0);
 }
 
+STATIC
+VOID
+ToggleVoiceOver (
+  IN  OC_PICKER_CONTEXT  *Context,
+  IN  UINT32             File  OPTIONAL
+  )
+{
+  if (!Context->PickerAudioAssist) {
+    Context->PickerAudioAssist = TRUE;
+    OcPlayAudioFile (Context, OcVoiceOverAudioFileWelcome, FALSE);
+
+    if (File != 0) {
+      OcPlayAudioFile (Context, File, TRUE);
+    }
+  } else {
+    OcPlayAudioBeep (
+      Context,
+      OC_VOICE_OVER_SIGNALS_ERROR,
+      OC_VOICE_OVER_SIGNAL_ERROR_MS,
+      OC_VOICE_OVER_SILENCE_ERROR_MS
+      );
+    Context->PickerAudioAssist = FALSE;
+  }
+}
+
 EFI_STATUS
 UiMenuMain (
   IN OC_PICKER_CONTEXT            *Context,
@@ -1929,6 +1954,8 @@ UiMenuMain (
   BOOLEAN                            SetDefault;
   BOOLEAN                            TimeoutExpired;
   OC_STORAGE_CONTEXT                 *Storage;
+  BOOLEAN                            PlayedOnce;
+  BOOLEAN                            PlayChosen;
   
   Selected         = 0;
   VisibleIndex     = 0;
@@ -1940,6 +1967,8 @@ UiMenuMain (
   Storage          = Context->CustomEntryContext;
   mDefaultEntry    = DefaultEntry;
   CustomEntryIndex = 0;
+  PlayedOnce       = FALSE;
+  PlayChosen       = Context->PickerAudioAssist;
   
   if (Storage->FileSystem != NULL && mFileSystem == NULL) {
     mFileSystem = Storage->FileSystem;
@@ -2000,6 +2029,23 @@ UiMenuMain (
                           BootEntries[DefaultEntry].IsExternal,
                           BootEntries[DefaultEntry].IsFolder
                           );
+    
+    if (!PlayedOnce && Context->PickerAudioAssist) {
+      OcPlayAudioFile (Context, OcVoiceOverAudioFileChooseOS, FALSE);
+      for (Index = 0; Index < VisibleIndex; ++Index) {
+        OcPlayAudioEntry (Context, &BootEntries[VisibleList[Index]], 1 + (UINT32) (&BootEntries[VisibleList[Index]] - BootEntries));
+        if (DefaultEntry == VisibleList[Index] && TimeOutSeconds > 0) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
+        }
+      }
+      OcPlayAudioBeep (
+        Context,
+        OC_VOICE_OVER_SIGNALS_NORMAL,
+        OC_VOICE_OVER_SIGNAL_NORMAL_MS,
+        OC_VOICE_OVER_SILENCE_NORMAL_MS
+        );
+      PlayedOnce = TRUE;
+    }
 
     while (TRUE) {
       KeyIndex = OcWaitForAppleKeyIndex (Context, KeyMap, 1000, Context->PollAppleHotKeys, &SetDefault);
@@ -2011,6 +2057,9 @@ UiMenuMain (
           && Context->AllowSetDefault
           && SetDefault;
         if (SetDefault) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
           Status = OcSetDefaultBootEntry (Context, &BootEntries[DefaultEntry]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
@@ -2018,6 +2067,7 @@ UiMenuMain (
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_ABORTED) {
         TimeOutSeconds = 0;
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileAbortTimeout, FALSE);
         break;
       } else if (KeyIndex == OC_INPUT_FUNCTIONAL(10)) {
         TimeOutSeconds = 0;
@@ -2028,6 +2078,9 @@ UiMenuMain (
         TimeOutSeconds = 0;
         FreeImage (mMenuImage);
         mMenuImage = NULL;
+        if (ShowAll) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileShowAuxiliary, FALSE);
+        }
         break;
       } else if (KeyIndex == OC_INPUT_UP || KeyIndex == OC_INPUT_LEFT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
@@ -2041,6 +2094,10 @@ UiMenuMain (
                               BootEntries[DefaultEntry].IsFolder
                               );
         TimeOutSeconds = 0;
+        if (PlayChosen) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
+        }
       } else if (KeyIndex == OC_INPUT_DOWN || KeyIndex == OC_INPUT_RIGHT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
         DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : 0;
@@ -2053,6 +2110,10 @@ UiMenuMain (
                               BootEntries[DefaultEntry].IsFolder
                               );
         TimeOutSeconds = 0;
+        if (PlayChosen) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
+        }
       } else if (KeyIndex != OC_INPUT_INVALID && (UINTN)KeyIndex < VisibleIndex) {
         ASSERT (KeyIndex >= 0);
         *ChosenBootEntry = &BootEntries[VisibleList[KeyIndex]];
@@ -2061,11 +2122,17 @@ UiMenuMain (
           && Context->AllowSetDefault
           && SetDefault;
         if (SetDefault) {
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
+          OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
+          OcPlayAudioEntry (Context, &BootEntries[VisibleList[KeyIndex]], 1 + (UINT32) (&BootEntries[VisibleList[KeyIndex]] - BootEntries));
           Status = OcSetDefaultBootEntry (Context, &BootEntries[VisibleList[KeyIndex]]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
         RestoreConsoleMode (Context);
         return EFI_SUCCESS;
+      } else if (KeyIndex == OC_INPUT_VOICE_OVER) {
+        ToggleVoiceOver (Context, 0);
+        PlayChosen = Context->PickerAudioAssist;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
       }
@@ -2106,6 +2173,9 @@ RunBootPicker (
   UINTN                              EntryCount;
   INTN                               DefaultEntry;
   BOOLEAN                            ForbidApple;
+  BOOLEAN                            SaidWelcome;
+
+  SaidWelcome  = FALSE;
   
   mHideAuxiliary = Context->HideAuxiliary;
   
@@ -2127,7 +2197,6 @@ RunBootPicker (
   if (Context->PickerCommand != OcPickerDefault) {
     Status = Context->RequestPrivilege (
                         Context,
-                        Context->PrivilegeContext,
                         OcPrivilegeAuthorized
                         );
     if (EFI_ERROR (Status)) {
@@ -2180,6 +2249,10 @@ RunBootPicker (
     DefaultEntry = OcGetDefaultBootEntry (Context, Entries, EntryCount);
 
     if (Context->PickerCommand == OcPickerShowPicker) {
+      if (!SaidWelcome) {
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileWelcome, FALSE);
+        SaidWelcome = TRUE;
+      }
       if (!ForbidApple && Context->PickerMode == OcPickerModeApple) {
         Status = OcRunAppleBootPicker ();
         DEBUG ((DEBUG_INFO, "OCUI: Apple BootPicker failed on error - %r, fallback to builtin\n", Status));
@@ -2195,6 +2268,7 @@ RunBootPicker (
         );
       
     } else if (Context->PickerCommand == OcPickerResetNvram) {
+      OcPlayAudioFile (Context, OcVoiceOverAudioFileResetNVRAM, FALSE);
       return SystemActionResetNvram ();
     } else {
       Chosen = &Entries[DefaultEntry];
@@ -2220,6 +2294,21 @@ RunBootPicker (
     }
 
     if (!EFI_ERROR (Status)) {
+      if (Context->PickerCommand == OcPickerShowPicker) {
+        //
+        // Voice chosen information.
+        //
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileLoading, FALSE);
+        Status = OcPlayAudioEntry (Context, Chosen, 1 + (UINT32) (Chosen - Entries));
+        if (EFI_ERROR (Status)) {
+          OcPlayAudioBeep (
+            Context,
+            OC_VOICE_OVER_SIGNALS_PASSWORD_OK,
+            OC_VOICE_OVER_SIGNAL_NORMAL_MS,
+            OC_VOICE_OVER_SILENCE_NORMAL_MS
+            );
+        }
+      }
       Status = OcLoadBootEntry (
         AppleBootPolicy,
         Context,
@@ -2231,11 +2320,14 @@ RunBootPicker (
       // Do not wait on successful return code.
       //
       if (EFI_ERROR (Status)) {
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileExecutionFailure, TRUE);
         gBS->Stall (SECONDS_TO_MICROSECONDS (3));
         //
         // Show picker on first failure.
         //
         Context->PickerCommand = OcPickerShowPicker;
+      } else {
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileExecutionSuccessful, FALSE);
       }
       //
       // Ensure that we flush all pressed keys after the application.

@@ -14,5 +14,3 @@ Instruction:
   * Icons folder need to be into  EFI/OC/ folder and Background.png need to be resized to match the screen resolution for it to load.
   * Config.plist set Misc->Boot->PickerMode = External
   * To build NdkBootPicker.efi, run "./ndk-macbuild.tool" at Terminal (require Xcode and Xcode Command Line Tool installed, and open xcode to accept license agreement before compiling).
-  
-  *Note: For users who is using BootChimeDxe.efi, this driver seems to prevent any other drivers to load and cause system hang after BootChimeDxe.efi was loaded. To prevent a system hang, make sure that NdkBootPicker.efi (and all other EFI drivers) are loaded BEFORE BootChimeDxe.efi. This can be achieved by making sure that BootChimeDxe.efi is the last driver in the UEFI->Drivers section of the OpenCore config.plist file. 
