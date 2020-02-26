@@ -1133,7 +1133,11 @@ CreateIcon (
       break;
   }
   
-  Icon = DecodePNGFile (FilePath);
+  if (FileExist (FilePath)) {
+    Icon = DecodePNGFile (FilePath);
+  } else {
+    Icon = CreateFilledImage (128, 128, TRUE, &mBluePixel);
+  }
   
   if (Icon != NULL) {
     TmpImage = CreateFilledImage (128, 128, TRUE, &mTransparentPixel);
@@ -1994,6 +1998,8 @@ UiMenuMain (
   ClearScreen (&mTransparentPixel);
   
   while (TRUE) {
+    FreeImage (mMenuImage);
+    mMenuImage = NULL;
     if (!TimeoutExpired) {
       TimeoutExpired = PrintTimeOutMessage (TimeOutSeconds);
       TimeOutSeconds = TimeoutExpired ? 10000 : TimeOutSeconds;
@@ -2076,8 +2082,6 @@ UiMenuMain (
         ShowAll = !ShowAll;
         DefaultEntry = mDefaultEntry;
         TimeOutSeconds = 0;
-        FreeImage (mMenuImage);
-        mMenuImage = NULL;
         if (ShowAll) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileShowAuxiliary, FALSE);
         }

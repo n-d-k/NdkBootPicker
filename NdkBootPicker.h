@@ -10,7 +10,7 @@
 
 #define NDK_BOOTPICKER_VERSION   "0.1.3"
 
-#define OC_VOICE_OVER_IDLE_TIMEOUT_MS     500  ///< Experimental, less is problematic.
+#define OC_VOICE_OVER_IDLE_TIMEOUT_MS     700  ///< Experimental, less is problematic.
 
 #define OC_VOICE_OVER_SIGNAL_NORMAL_MS    200  ///< From boot.efi, constant.
 #define OC_VOICE_OVER_SILENCE_NORMAL_MS   150  ///< From boot.efi, constant.
@@ -132,6 +132,7 @@ mMenuFadeIntensity = 150;     // ranging from 0 to 255 0 = completely disappear,
 /*=========== Default colors settings ==============*/
 
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL mTransparentPixel  = {0x00, 0x00, 0x00, 0x00};
+EFI_GRAPHICS_OUTPUT_BLT_PIXEL mBluePixel  = {0x7f, 0x0f, 0x0f, 0xff};
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL mBlackPixel  = {0x00, 0x00, 0x00, 0xff};
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL mLowWhitePixel  = {0xb8, 0xbd, 0xbf, 0xff};
 
