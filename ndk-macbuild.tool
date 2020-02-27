@@ -171,6 +171,8 @@ if [ "$SKIP_BUILD" != "1" ]; then
   fi
 fi
 
+sed -i '' 's/NdkBootPicker/BootKicker/g' $(pwd)/OcSupportPkg/OcSupportPkg.dsc
+
 cd .. || exit 1
 
 if [ "$SKIP_PACKAGE" != "1" ]; then
