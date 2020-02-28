@@ -2014,6 +2014,7 @@ UiMenuMain (
           || (BootEntries[Index].Type == OcBootUnknown && !ShowAll)
           || (BootEntries[Index].DevicePath == NULL && !ShowAll)
           || (BootEntries[Index].IsAuxiliary && !ShowAll)) {
+        DefaultEntry = DefaultEntry == Index ? ++DefaultEntry : DefaultEntry;
         continue;
       }
       if (DefaultEntry == Index) {
@@ -2107,7 +2108,7 @@ UiMenuMain (
         }
       } else if (KeyIndex == OC_INPUT_DOWN || KeyIndex == OC_INPUT_RIGHT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
-        DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : 0;
+        DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : VisibleList[0];
         Selected = Selected < (VisibleIndex - 1) ? ++Selected : 0;
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
         PrintTextDescription (MaxStrWidth,
