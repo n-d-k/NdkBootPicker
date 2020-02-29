@@ -103,9 +103,9 @@ fi
 if [ ! -d "Binaries" ]; then
   mkdir Binaries || exit 1
   cd Binaries || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/RELEASE_XCODE5/X64 RELEASE || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/DEBUG_XCODE5/X64 DEBUG || exit 1
-  ln -s ../UDK/Build/OcSupportPkg/NOOPT_XCODE5/X64 NOOPT || exit 1
+  ln -s ../UDK/Build/OpenCorePkg/RELEASE_XCODE5/X64 RELEASE || exit 1
+  ln -s ../UDK/Build/OpenCorePkg/DEBUG_XCODE5/X64 DEBUG || exit 1
+  ln -s ../UDK/Build/OpenCorePkg/NOOPT_XCODE5/X64 NOOPT || exit 1
   cd .. || exit 1
 fi
 
@@ -142,13 +142,14 @@ fi
 updaterepo "https://github.com/acidanthera/audk.git" UDK master || exit 1
 cd UDK
 updaterepo "https://github.com/acidanthera/EfiPkg" EfiPkg master || exit 1
-updaterepo "https://github.com/acidanthera/OcSupportPkg.git" OcSupportPkg master || exit 1
+updaterepo "https://github.com/acidanthera/MacInfoPkg" MacInfoPkg master || exit 1
+updaterepo "https://github.com/acidanthera/OpenCorePkg.git" OpenCorePkg master || exit 1
 
-if [ ! -d $(pwd)/OcSupportPkg/Application/NdkBootPicker ]; then
-  ln -s ../../.. OcSupportPkg/Application/NdkBootPicker || exit 1
+if [ ! -d $(pwd)/OpenCorePkg/Application/NdkBootPicker ]; then
+  ln -s ../../.. OpenCorePkg/Application/NdkBootPicker || exit 1
 fi
 
-sed -i '' 's/BootKicker/NdkBootPicker/g' $(pwd)/OcSupportPkg/OcSupportPkg.dsc
+sed -i '' 's/BootKicker/NdkBootPicker/g' $(pwd)/OpenCorePkg/OpenCorePkg.dsc
 
 source edksetup.sh || exit 1
 
@@ -159,19 +160,19 @@ fi
 
 if [ "$SKIP_BUILD" != "1" ]; then
   if [ "$MODE" = "" ] || [ "$MODE" = "DEBUG" ]; then
-    build -a X64 -b DEBUG -t XCODE5 -p OcSupportPkg/OcSupportPkg.dsc || exit 1
+    build -a X64 -b DEBUG -t XCODE5 -p OpenCorePkg/OpenCorePkg.dsc || exit 1
   fi
 
   if [ "$MODE" = "" ] || [ "$MODE" = "DEBUG" ]; then
-    build -a X64 -b NOOPT -t XCODE5 -p OcSupportPkg/OcSupportPkg.dsc || exit 1
+    build -a X64 -b NOOPT -t XCODE5 -p OpenCorePkg/OpenCorePkg.dsc || exit 1
   fi
 
   if [ "$MODE" = "" ] || [ "$MODE" = "RELEASE" ]; then
-    build -a X64 -b RELEASE -t XCODE5 -p OcSupportPkg/OcSupportPkg.dsc || exit 1
+    build -a X64 -b RELEASE -t XCODE5 -p OpenCorePkg/OpenCorePkg.dsc || exit 1
   fi
 fi
 
-sed -i '' 's/NdkBootPicker/BootKicker/g' $(pwd)/OcSupportPkg/OcSupportPkg.dsc
+sed -i '' 's/NdkBootPicker/BootKicker/g' $(pwd)/OpenCorePkg/OpenCorePkg.dsc
 
 cd .. || exit 1
 
