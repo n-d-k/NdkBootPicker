@@ -1430,7 +1430,7 @@ LoadFontImage (
   if (FileExist (L"EFI\\OC\\Icons\\font.png")) {
     NewImage = DecodePNGFile (L"EFI\\OC\\Icons\\font.png");
   } else {
-    NewImage = DecodePNG (ACCESS_DATA(font_data), ACCESS_SIZE(font_data));
+    NewImage = DecodePNG ((VOID *) &emb_font_data, (UINT32) emb_font_data_size);
   }
   
   ImageWidth = NewImage->Width;
