@@ -1034,7 +1034,6 @@ TakeScreenShot (
   Status = EncodePng (ImagePNG,
                       (UINTN) Image->Width,
                       (UINTN) Image->Height,
-                      8,
                       &Buffer,
                       &BufferSize
                       );
@@ -1912,31 +1911,6 @@ RestoreConsoleMode (
   gST->ConOut->SetCursorPosition (gST->ConOut, 0, 0);
 }
 
-STATIC
-VOID
-ToggleVoiceOver (
-  IN  OC_PICKER_CONTEXT  *Context,
-  IN  UINT32             File  OPTIONAL
-  )
-{
-  if (!Context->PickerAudioAssist) {
-    Context->PickerAudioAssist = TRUE;
-    OcPlayAudioFile (Context, OcVoiceOverAudioFileWelcome, FALSE);
-
-    if (File != 0) {
-      OcPlayAudioFile (Context, File, TRUE);
-    }
-  } else {
-    OcPlayAudioBeep (
-      Context,
-      OC_VOICE_OVER_SIGNALS_ERROR,
-      OC_VOICE_OVER_SIGNAL_ERROR_MS,
-      OC_VOICE_OVER_SILENCE_ERROR_MS
-      );
-    Context->PickerAudioAssist = FALSE;
-  }
-}
-
 EFI_STATUS
 UiMenuMain (
   IN OC_PICKER_CONTEXT            *Context,
@@ -2139,7 +2113,7 @@ UiMenuMain (
         RestoreConsoleMode (Context);
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_VOICE_OVER) {
-        ToggleVoiceOver (Context, 0);
+        OcToggleVoiceOver (Context, 0);
         PlayChosen = Context->PickerAudioAssist;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
