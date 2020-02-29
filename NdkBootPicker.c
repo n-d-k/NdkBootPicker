@@ -2020,7 +2020,7 @@ UiMenuMain (
     if (!PlayedOnce && Context->PickerAudioAssist) {
       OcPlayAudioFile (Context, OcVoiceOverAudioFileChooseOS, FALSE);
       for (Index = 0; Index < VisibleIndex; ++Index) {
-        OcPlayAudioEntry (Context, &BootEntries[VisibleList[Index]], 1 + (UINT32) (&BootEntries[VisibleList[Index]] - BootEntries));
+        OcPlayAudioEntry (Context, &BootEntries[VisibleList[Index]], 1 + (UINT32) Index);
         if (DefaultEntry == VisibleList[Index] && TimeOutSeconds > 0) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
         }
@@ -2046,7 +2046,7 @@ UiMenuMain (
         if (SetDefault) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
           OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
           Status = OcSetDefaultBootEntry (Context, &BootEntries[DefaultEntry]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
@@ -2078,7 +2078,7 @@ UiMenuMain (
         TimeOutSeconds = 0;
         if (PlayChosen) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
         }
       } else if (KeyIndex == OC_INPUT_DOWN || KeyIndex == OC_INPUT_RIGHT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
@@ -2094,7 +2094,7 @@ UiMenuMain (
         TimeOutSeconds = 0;
         if (PlayChosen) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) (&BootEntries[DefaultEntry] - BootEntries));
+          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
         }
       } else if (KeyIndex != OC_INPUT_INVALID && (UINTN)KeyIndex < VisibleIndex) {
         ASSERT (KeyIndex >= 0);
@@ -2106,7 +2106,7 @@ UiMenuMain (
         if (SetDefault) {
           OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
           OcPlayAudioFile (Context, OcVoiceOverAudioFileDefault, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[VisibleList[KeyIndex]], 1 + (UINT32) (&BootEntries[VisibleList[KeyIndex]] - BootEntries));
+          OcPlayAudioEntry (Context, &BootEntries[VisibleList[KeyIndex]], 1 + (UINT32) Selected);
           Status = OcSetDefaultBootEntry (Context, &BootEntries[VisibleList[KeyIndex]]);
           DEBUG ((DEBUG_INFO, "OCUI: Setting default - %r\n", Status));
         }
