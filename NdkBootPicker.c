@@ -2014,6 +2014,9 @@ UiMenuMain (
                           BootEntries[DefaultEntry].IsFolder
                           );
     
+    if (ShowAll && PlayedOnce) {
+      OcPlayAudioFile (Context, OcVoiceOverAudioFileShowAuxiliary, FALSE);
+    }
     if (!PlayedOnce && Context->PickerAudioAssist) {
       OcPlayAudioFile (Context, OcVoiceOverAudioFileChooseOS, FALSE);
       for (Index = 0; Index < VisibleIndex; ++Index) {
@@ -2060,9 +2063,6 @@ UiMenuMain (
         ShowAll = !ShowAll;
         DefaultEntry = mDefaultEntry;
         TimeOutSeconds = 0;
-        if (ShowAll) {
-          OcPlayAudioFile (Context, OcVoiceOverAudioFileShowAuxiliary, FALSE);
-        }
         break;
       } else if (KeyIndex == OC_INPUT_UP || KeyIndex == OC_INPUT_LEFT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
