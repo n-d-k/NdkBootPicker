@@ -1948,7 +1948,7 @@ UiMenuMain (
   mDefaultEntry    = DefaultEntry;
   CustomEntryIndex = 0;
   PlayedOnce       = FALSE;
-  PlayChosen       = Context->PickerAudioAssist;
+  PlayChosen       = FALSE;
   
   if (Storage->FileSystem != NULL && mFileSystem == NULL) {
     mFileSystem = Storage->FileSystem;
@@ -2035,6 +2035,11 @@ UiMenuMain (
 
     while (TRUE) {
       KeyIndex = OcWaitForAppleKeyIndex (Context, KeyMap, 1000, Context->PollAppleHotKeys, &SetDefault);
+      if (PlayChosen && KeyIndex == OC_INPUT_TIMEOUT) {
+        OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
+        OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
+        PlayChosen = FALSE;
+      }
       --TimeOutSeconds;
       if ((KeyIndex == OC_INPUT_TIMEOUT && TimeOutSeconds == 0) || KeyIndex == OC_INPUT_CONTINUE) {
         *ChosenBootEntry = &BootEntries[DefaultEntry];
@@ -2075,10 +2080,7 @@ UiMenuMain (
                               BootEntries[DefaultEntry].IsFolder
                               );
         TimeOutSeconds = 0;
-        if (PlayChosen) {
-          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
-        }
+        PlayChosen = Context->PickerAudioAssist;
       } else if (KeyIndex == OC_INPUT_DOWN || KeyIndex == OC_INPUT_RIGHT) {
         SwitchIconSelection (VisibleIndex, Selected, FALSE);
         DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : VisibleList[0];
@@ -2091,10 +2093,7 @@ UiMenuMain (
                               BootEntries[DefaultEntry].IsFolder
                               );
         TimeOutSeconds = 0;
-        if (PlayChosen) {
-          OcPlayAudioFile (Context, OcVoiceOverAudioFileSelected, FALSE);
-          OcPlayAudioEntry (Context, &BootEntries[DefaultEntry], 1 + (UINT32) Selected);
-        }
+        PlayChosen = Context->PickerAudioAssist;
       } else if (KeyIndex != OC_INPUT_INVALID && (UINTN)KeyIndex < VisibleIndex) {
         ASSERT (KeyIndex >= 0);
         *ChosenBootEntry = &BootEntries[VisibleList[KeyIndex]];
@@ -2113,7 +2112,8 @@ UiMenuMain (
         return EFI_SUCCESS;
       } else if (KeyIndex == OC_INPUT_VOICE_OVER) {
         OcToggleVoiceOver (Context, 0);
-        PlayChosen = Context->PickerAudioAssist;
+        TimeOutSeconds = 0;
+        break;
       } else if (KeyIndex != OC_INPUT_TIMEOUT) {
         TimeOutSeconds = 0;
       }
