@@ -10,7 +10,6 @@
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleTextOut.h>
 #include <Protocol/UgaDraw.h>
-#include <Protocol/HiiFont.h>
 #include <Protocol/OcInterface.h>
 
 #include <Library/BaseLib.h>
