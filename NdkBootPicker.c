@@ -1092,10 +1092,14 @@ CreateIcon (
       }
       break;
     case OcBootApple:
-      if (StrStr (Name, L"Cata") != NULL) {
+      if (StrStr (Name, L"Install") != NULL) {
+        FilePath = L"EFI\\OC\\Icons\\os_Install.icns";
+      } else if (StrStr (Name, L"Cata") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_cata.icns";
       } else if (StrStr (Name, L"Moja") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_moja.icns";
+      } else if (StrStr (Name, L"Clone") != NULL) {
+        FilePath = L"EFI\\OC\\Icons\\os_clone.icns";
       } else {
         FilePath = L"EFI\\OC\\Icons\\os_mac.icns";
       }
@@ -1116,10 +1120,10 @@ CreateIcon (
         FilePath = L"EFI\\OC\\Icons\\os_fedora.icns";
       } else if (StrStr (Name, L"Shell") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\tool_shell.icns";
-      } else if (StrStr (Name, L"Win") != NULL) {
-        FilePath = L"EFI\\OC\\Icons\\os_win.icns";
       } else if (StrStr (Name, L"10") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_win10.icns";
+      } else if (StrStr (Name, L"Win") != NULL) {
+        FilePath = L"EFI\\OC\\Icons\\os_win.icns";
       } else {
         FilePath = L"EFI\\OC\\Icons\\os_custom.icns";
       }
@@ -2004,7 +2008,7 @@ InitMouse (
   if (FileExist (FilePath)) {
     mPointer.Pointer = DecodePNGFile (FilePath);
   } else {
-    mPointer.Pointer = CreateFilledImage (32, 32, TRUE, &mBluePixel);
+    mPointer.Pointer = CreateFilledImage (POINTER_WIDTH, POINTER_HEIGHT, TRUE, &mBluePixel);
   }
   
   if(mPointer.Pointer == NULL) {
