@@ -47,6 +47,7 @@
 
 [Protocols]
   gOcInterfaceProtocolGuid                 ## SOMETIMES_PRODUCES
+  gEfiSimplePointerProtocolGuid            ## BY_START
 
 [LibraryClasses]
   OcBootManagementLib
