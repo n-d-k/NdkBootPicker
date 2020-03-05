@@ -154,6 +154,10 @@ STATIC
 NDK_UI_IMAGE *
 mMenuImage = NULL;
 
+STATIC
+NDK_UI_IMAGE *
+mSelectionImage = NULL;
+
 BOOLEAN
 mSelectorUsed = TRUE;
 
