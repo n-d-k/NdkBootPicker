@@ -8,7 +8,7 @@
 #ifndef NdkBootPicker_h
 #define NdkBootPicker_h
 
-#define NDK_BOOTPICKER_VERSION   "0.1.7"
+#define NDK_BOOTPICKER_VERSION   "0.1.8"
 
 STATIC
 BOOLEAN
