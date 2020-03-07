@@ -37,6 +37,8 @@
 [Sources]
   NdkBootPicker.h
   NdkBootPicker.c
+  ImageSupport.c
+  FontData.h
 
 [Packages]
   OpenCorePkg/OpenCorePkg.dec
