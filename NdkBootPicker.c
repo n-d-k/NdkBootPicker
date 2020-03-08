@@ -678,7 +678,7 @@ CreateIcon (
     case OC_BOOT_APPLE_TIME_MACHINE:
       FilePath = L"EFI\\OC\\Icons\\os_clone.icns";
       break;
-    case OC_BOOT_CUSTOM:
+    case OC_BOOT_EXTERNAL_OS:
       if (StrStr (Name, L"Free") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_freebsd.icns";
       } else if (StrStr (Name, L"Linux") != NULL) {
@@ -689,8 +689,6 @@ CreateIcon (
         FilePath = L"EFI\\OC\\Icons\\os_ubuntu.icns";
       } else if (StrStr (Name, L"Fedora") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_fedora.icns";
-      } else if (StrStr (Name, L"Shell") != NULL) {
-        FilePath = L"EFI\\OC\\Icons\\tool_shell.icns";
       } else if (StrStr (Name, L"10") != NULL) {
         FilePath = L"EFI\\OC\\Icons\\os_win10.icns";
       } else if (StrStr (Name, L"Win") != NULL) {
@@ -699,8 +697,12 @@ CreateIcon (
         FilePath = L"EFI\\OC\\Icons\\os_custom.icns";
       }
       break;
-    case OC_BOOT_APPLE_ANY:
-      FilePath = L"EFI\\OC\\Icons\\os_mac.icns";
+    case OC_BOOT_EXTERNAL_TOOL:
+      if (StrStr (Name, L"Shell") != NULL) {
+        FilePath = L"EFI\\OC\\Icons\\tool_shell.icns";
+      } else {
+        FilePath = L"EFI\\OC\\Icons\\os_custom.icns";
+      }
       break;
     case OC_BOOT_SYSTEM:
       FilePath = L"EFI\\OC\\Icons\\func_resetnvram.icns";
@@ -2205,7 +2207,7 @@ UiMenuMain (
   for (Index = 0; Index < MIN (Count, OC_INPUT_MAX); ++Index) {
     StrWidth = UnicodeStringDisplayLength (BootEntries[Index].Name) + ((BootEntries[Index].IsFolder || BootEntries[Index].IsExternal) ? 11 : 5);
     MaxStrWidth = MaxStrWidth > StrWidth ? MaxStrWidth : StrWidth;
-    if (BootEntries[Index].Type == OC_BOOT_CUSTOM) {
+    if (BootEntries[Index].Type == OC_BOOT_EXTERNAL_OS || BootEntries[Index].Type == OC_BOOT_EXTERNAL_TOOL) {
       BootEntries[Index].IsAuxiliary = Context->CustomEntries[CustomEntryIndex].Auxiliary;
       ++CustomEntryIndex;
     }
