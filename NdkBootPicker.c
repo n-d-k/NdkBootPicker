@@ -1847,14 +1847,10 @@ OcWaitForKeyIndex (
   UINT64                             EndTime;
   UINTN                              CsrActiveConfigSize;
   INTN                               KeyClick;
-
-  //
-  // These hotkeys are normally parsed by boot.efi, and they work just fine
-  // when ShowPicker is disabled. On some BSPs, however, they may fail badly
-  // when ShowPicker is enabled, and for this reason we support these hotkeys
-  // within picker itself.
-  //
-
+  INTN                               CycleCount;
+  
+  CycleCount = 0;
+  
   CurrTime  = GetTimeInNanoSecond (GetPerformanceCounter ());
   EndTime   = CurrTime + Timeout * 1000000ULL;
 
@@ -1882,6 +1878,18 @@ OcWaitForKeyIndex (
           KeyClick = CheckIconClick ();
           if (KeyClick >= 0) {
             return KeyClick;
+          }
+          break;
+        case MouseMove:
+          CycleCount++;
+          mPointer.MouseEvent = NoEvents;
+          if (CycleCount == 10) {
+            KeyClick = CheckIconClick ();
+            if (KeyClick >= 0 && KeyClick != mCurrentSelection) {
+              mCurrentSelection = KeyClick;
+              return OC_INPUT_POINTER;
+            }
+            CycleCount = 0;
           }
           break;
         default:
