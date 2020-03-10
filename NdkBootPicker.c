@@ -2364,6 +2364,10 @@ UiMenuMain (
     
     PrintOcVersion (Context->TitleSuffix, ShowAll);
     PrintDateTime (ShowAll);
+    if (!TimeoutExpired) {
+      TimeoutExpired = PrintTimeOutMessage (TimeOutSeconds);
+      TimeOutSeconds = TimeoutExpired ? 10000 : TimeOutSeconds;
+    }
     
     if (mPointer.SimplePointerProtocol == NULL) {
       InitMouse ();
