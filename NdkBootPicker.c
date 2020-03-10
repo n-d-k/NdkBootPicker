@@ -24,6 +24,10 @@ STATIC
 INTN
 mCurrentSelection;
 
+STATIC
+INTN
+mMenuIconsCount;
+
 /*========== Pointer Setting ==========*/
 
 POINTERS mPointer = {NULL, NULL, NULL, NULL,
@@ -109,6 +113,10 @@ mMenuImage = NULL;
 STATIC
 NDK_UI_IMAGE *
 mSelectionImage = NULL;
+
+STATIC
+NDK_UI_IMAGE *
+mLabelImage = NULL;
 
 BOOLEAN
 mSelectorUsed = TRUE;
@@ -339,27 +347,29 @@ CreateMenuImage (
   INTN                   Xpos;
   INTN                   Ypos;
   INTN                   Offset;
+  INTN                   IconRowSpace;
   
   NewImage = NULL;
   Xpos = 0;
   Ypos = 0;
+  IconRowSpace = (32 * mUiScale >> 4) + 10;
   
   if (mMenuImage != NULL) {
     Width = mMenuImage->Width;
     Height = mMenuImage->Height;
-    IsTwoRow = mMenuImage->Height > mIconSpaceSize;
+    IsTwoRow = mMenuImage->Height > mIconSpaceSize + IconRowSpace;
     
     if (IsTwoRow) {
       IconsPerRow = mMenuImage->Width / mIconSpaceSize;
       Xpos = (IconCount - IconsPerRow) * mIconSpaceSize;
-      Ypos = mIconSpaceSize;
+      Ypos = mIconSpaceSize + IconRowSpace;
     } else {
       if (mMenuImage->Width + (mIconSpaceSize * 2) <= mScreenWidth) {
         Width = mMenuImage->Width + mIconSpaceSize;
         Xpos = mMenuImage->Width;
       } else {
-        Height = mMenuImage->Height + mIconSpaceSize;
-        Ypos = mIconSpaceSize;
+        Height = mMenuImage->Height + mIconSpaceSize + IconRowSpace;
+        Ypos = mIconSpaceSize + IconRowSpace;
       }
     }
   } else {
@@ -759,6 +769,7 @@ SwitchIconSelection (
   UINT16                 Width;
   UINT16                 Height;
   UINTN                  IconsPerRow;
+  INTN                   IconRowSpace;
   
   /* Begin Calculating Xpos and Ypos of current selected icon on screen*/
   NewImage = NULL;
@@ -769,6 +780,7 @@ SwitchIconSelection (
   Width = mIconSpaceSize;
   Height = Width;
   IconsPerRow = 1;
+  IconRowSpace = (32 * mUiScale >> 4) + 10;
   
   for (IconsPerRow = 1; IconsPerRow < IconCount; ++IconsPerRow) {
     Width = Width + mIconSpaceSize;
@@ -785,7 +797,7 @@ SwitchIconSelection (
       Ypos = (mScreenHeight / 2) - mIconSpaceSize;
     } else {
       Xpos = (mScreenWidth - Width) / 2 + (mIconSpaceSize * (IconIndex - (IconsPerRow + 1)));
-      Ypos = mScreenHeight / 2;
+      Ypos = mScreenHeight / 2 + IconRowSpace;
     }
   } else {
     Xpos = (mScreenWidth - Width) / 2 + (mIconSpaceSize * IconIndex);
@@ -799,7 +811,7 @@ SwitchIconSelection (
   }
   
   RawCopy (Icon->Bitmap,
-           mMenuImage->Bitmap + ((IconIndex <= IconsPerRow) ? mIconPaddingSize : mIconPaddingSize + mIconSpaceSize) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
+           mMenuImage->Bitmap + ((IconIndex <= IconsPerRow) ? mIconPaddingSize : mIconPaddingSize + mIconSpaceSize + IconRowSpace) * mMenuImage->Width + ((Xpos + mIconPaddingSize) - ((mScreenWidth - Width) / 2)),
            Icon->Width,
            Icon->Height,
            Icon->Width,
@@ -928,6 +940,12 @@ ClearScreen (
     mSelectionImage = DecodePNGFile (L"EFI\\OC\\Icons\\Selector4k.png");
   } else if (mSelectorUsed && FileExist (L"EFI\\OC\\Icons\\Selector.png")) {
     mSelectionImage = DecodePNGFile (L"EFI\\OC\\Icons\\Selector.png");
+  }
+  
+  if (FileExist (L"EFI\\OC\\Icons\\Label.png")) {
+    mLabelImage = DecodePNGFile (L"EFI\\OC\\Icons\\Label.png");
+  } else {
+    mLabelImage = CreateFilledImage (mIconSpaceSize, 32, TRUE, &mTransparentPixel);
   }
 }
 
@@ -1361,10 +1379,80 @@ PrintTextGraphicXY (
     BltImageAlpha (TextImage, Xpos, Ypos, &mTransparentPixel, 16);
   }
 }
-
 //
 //     Text rendering end
 //
+VOID
+PrintLabel (
+  IN OC_BOOT_ENTRY   *Entries,
+  IN UINTN           *VisibleList,
+  IN UINTN           VisibleIndex,
+  IN INTN            Xpos,
+  IN INTN            Ypos
+  )
+{
+  NDK_UI_IMAGE    *TextImage;
+  NDK_UI_IMAGE    *NewImage;
+  NDK_UI_IMAGE    *LabelImage;
+  UINTN           Index;
+  CHAR16          *String;
+  UINTN           Length;
+  INTN            Rows;
+  INTN            IconsPerRow;
+  INTN            NewXpos;
+  INTN            NewYpos;
+  
+  Length = 144 / mFontWidth;
+  Rows = mMenuImage->Height / mIconSpaceSize;
+  IconsPerRow = mMenuImage->Width / mIconSpaceSize;
+  NewXpos = Xpos;
+  NewYpos = Ypos;
+  
+  for (Index = 0; Index < VisibleIndex; ++Index) {
+    if (StrLen (Entries[VisibleList[Index]].Name) > Length) {
+      String = AllocateZeroPool ((Length + 1) * sizeof (CHAR16));
+      StrnCpyS (String, Length + 1, Entries[VisibleList[Index]].Name, Length - 2);
+      StrCatS (String, Length + 1, L"..");
+      TextImage = CreateTextImage (String);
+      FreePool (String);
+    } else {
+      TextImage = CreateTextImage (Entries[VisibleList[Index]].Name);
+    }
+    
+    if (TextImage == NULL) {
+      return;
+    }
+    
+    LabelImage = CopyScaledImage (mLabelImage, mUiScale);
+     
+    NewImage = CreateImage (MIN (LabelImage->Width, mIconSpaceSize), LabelImage->Height, FALSE);
+    
+    if (Index == IconsPerRow) {
+      NewXpos = Xpos;
+      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + 10;
+    }
+     
+    TakeImage (NewImage, NewXpos, NewYpos + mIconSpaceSize + 10, LabelImage->Width, LabelImage->Height);
+     
+    RawComposeAlpha (NewImage->Bitmap,
+                     LabelImage->Bitmap,
+                     NewImage->Width,
+                     NewImage->Height,
+                     NewImage->Width,
+                     LabelImage->Width,
+                     200
+                     );
+     
+    FreeImage (LabelImage);
+    
+    ComposeImage (NewImage, TextImage, (NewImage->Width - TextImage->Width) >> 1, (NewImage->Height - TextImage->Height) >> 1);
+    
+    DrawImageArea (NewImage, 0, 0, 0, 0, NewXpos, NewYpos + mIconSpaceSize + 10);
+    FreeImage (TextImage);
+    FreeImage (NewImage);
+    NewXpos = NewXpos + mIconSpaceSize;
+  }
+}
 
 STATIC
 VOID
@@ -1468,55 +1556,6 @@ PrintTimeOutMessage (
     ClearScreenArea (&mTransparentPixel, 0, ((mScreenHeight / 4) * 3) - 4, mScreenWidth, mFontHeight * 2);
   }
   return !(Timeout > 0);
-}
-
-STATIC
-VOID
-PrintTextDescription (
-  IN UINTN        MaxStrWidth,
-  IN UINTN        Selected,
-  IN CHAR16       *Name,
-  IN BOOLEAN      Ext,
-  IN BOOLEAN      Dmg
-  )
-{
-  NDK_UI_IMAGE    *TextImage;
-  NDK_UI_IMAGE    *NewImage;
-  CHAR16          Code[3];
-  CHAR16          String[MaxStrWidth + 1];
-  
-  Code[0] = 0x20;
-  Code[1] = OC_INPUT_STR[Selected];
-  Code[2] = '\0';
-  
-  UnicodeSPrint (String, sizeof (String), L" %s%s%s%s%s ",
-                 Code,
-                 (mAllowSetDefault && mDefaultEntry == Selected) ? L".*" : L". ",
-                 Name,
-                 Ext ? L" (ext)" : L"",
-                 Dmg ? L" (dmg)" : L""
-                 );
-  
-  TextImage = CreateTextImage (String);
-  if (TextImage == NULL) {
-    return;
-  }
-  NewImage = CreateFilledImage (mScreenWidth, TextImage->Height, TRUE, &mTransparentPixel);
-  if (NewImage == NULL) {
-    FreeImage (TextImage);
-    return;
-  }
-  ComposeImage (NewImage, TextImage, (NewImage->Width - TextImage->Width) / 2, 0);
-  if (TextImage != NULL) {
-    FreeImage (TextImage);
-  }
- 
-  BltImageAlpha (NewImage,
-                 (mScreenWidth - NewImage->Width) / 2,
-                 (mScreenHeight / 2) + mIconSpaceSize,
-                 &mTransparentPixel,
-                 16
-                 );
 }
 
 /* Mouse Functions Begin */
@@ -1736,7 +1775,7 @@ MouseInRect (
   return  ((mPointer.NewPlace.Xpos >= Place->Xpos)
            && (mPointer.NewPlace.Xpos < (Place->Xpos + (INTN) Place->Width))
            && (mPointer.NewPlace.Ypos >= Place->Ypos)
-           && (mPointer.NewPlace.Ypos < (Place->Ypos + (INTN) Place->Height))
+           && (mPointer.NewPlace.Ypos < (Place->Ypos + (INTN) Place->Height)  + (32 * mUiScale >> 4) + 10)
            );
 }
 
@@ -1746,7 +1785,6 @@ CheckIconClick (
   VOID
   )
 {
-  INTN       TotalIcons;
   INTN       IconsPerRow;
   INTN       Rows;
   INTN       Xpos;
@@ -1768,13 +1806,12 @@ CheckIconClick (
   
   Rows = mMenuImage->Height / mIconSpaceSize;
   IconsPerRow = mMenuImage->Width / mIconSpaceSize;
-  TotalIcons = (mMenuImage->Width / mIconSpaceSize) * Rows;
   Xpos = (mScreenWidth - mMenuImage->Width) / 2;
   Ypos = (mScreenHeight / 2) - mIconSpaceSize;
   NewXpos = Xpos;
   NewYpos = Ypos;
   
-  for (Index = 0; Index < TotalIcons; ++Index) {
+  for (Index = 0; Index < mMenuIconsCount; ++Index) {
     Place.Xpos = NewXpos;
     Place.Ypos = NewYpos;
     if (MouseInRect (&Place)) {
@@ -1784,7 +1821,7 @@ CheckIconClick (
     NewXpos = NewXpos + mIconSpaceSize;
     if (Index == (IconsPerRow - 1)) {
       NewXpos = Xpos;
-      NewYpos = Ypos + mIconSpaceSize;
+      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + 10;
     }
   }
   return Result;
@@ -2151,6 +2188,8 @@ RestoreConsoleMode (
   mFontImage = NULL;
   FreeImage (mSelectionImage);
   mSelectionImage = NULL;
+  FreeImage (mLabelImage);
+  mLabelImage = NULL;
   ClearScreenArea (&mBlackPixel, 0, 0, mScreenWidth, mScreenHeight);
   mUiScale = 0;
   mTextScale = 0;
@@ -2179,8 +2218,6 @@ UiMenuMain (
   UINTN                              VisibleIndex;
   BOOLEAN                            ShowAll;
   UINTN                              Selected;
-  UINTN                              MaxStrWidth;
-  UINTN                              StrWidth;
   APPLE_KEY_MAP_AGGREGATOR_PROTOCOL  *KeyMap;
   BOOLEAN                            SetDefault;
   BOOLEAN                            TimeoutExpired;
@@ -2190,7 +2227,6 @@ UiMenuMain (
   
   Selected         = 0;
   VisibleIndex     = 0;
-  MaxStrWidth      = 0;
   TimeoutExpired   = FALSE;
   ShowAll          = !mHideAuxiliary;
   TimeOutSeconds   = Context->TimeoutSeconds;
@@ -2213,8 +2249,6 @@ UiMenuMain (
   }
   
   for (Index = 0; Index < MIN (Count, OC_INPUT_MAX); ++Index) {
-    StrWidth = UnicodeStringDisplayLength (BootEntries[Index].Name) + ((BootEntries[Index].IsFolder || BootEntries[Index].IsExternal) ? 11 : 5);
-    MaxStrWidth = MaxStrWidth > StrWidth ? MaxStrWidth : StrWidth;
     if (BootEntries[Index].Type == OC_BOOT_EXTERNAL_OS || BootEntries[Index].Type == OC_BOOT_EXTERNAL_TOOL) {
       BootEntries[Index].IsAuxiliary = Context->CustomEntries[CustomEntryIndex].Auxiliary;
       ++CustomEntryIndex;
@@ -2255,17 +2289,13 @@ UiMenuMain (
       ++VisibleIndex;
     }
     
-    ClearScreenArea (&mTransparentPixel, 0, (mScreenHeight / 2) - mIconSpaceSize, mScreenWidth, mIconSpaceSize * 2);
+    ClearScreenArea (&mTransparentPixel, 0, (mScreenHeight / 2) - mIconSpaceSize, mScreenWidth, mIconSpaceSize * 3);
     BltMenuImage (mMenuImage, (mScreenWidth - mMenuImage->Width) / 2, (mScreenHeight / 2) - mIconSpaceSize);
-    mCurrentSelection = Selected;
+    PrintLabel (BootEntries, VisibleList, VisibleIndex, (mScreenWidth - mMenuImage->Width) / 2, (mScreenHeight / 2) - mIconSpaceSize);
     SwitchIconSelection (VisibleIndex, Selected, TRUE);
-    PrintTextDescription (MaxStrWidth,
-                          Selected,
-                          BootEntries[DefaultEntry].Name,
-                          BootEntries[DefaultEntry].IsExternal,
-                          BootEntries[DefaultEntry].IsFolder
-                          );
-    
+    mCurrentSelection = Selected;
+    mMenuIconsCount = VisibleIndex;
+
     if (ShowAll && PlayedOnce) {
       OcPlayAudioFile (Context, OcVoiceOverAudioFileShowAuxiliary, FALSE);
     }
@@ -2335,12 +2365,6 @@ UiMenuMain (
         Selected = Selected > 0 ? --Selected : VisibleIndex - 1;
         mCurrentSelection = Selected;
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
-        PrintTextDescription (MaxStrWidth,
-                              Selected,
-                              BootEntries[DefaultEntry].Name,
-                              BootEntries[DefaultEntry].IsExternal,
-                              BootEntries[DefaultEntry].IsFolder
-                              );
         TimeOutSeconds = 0;
         PlayChosen = Context->PickerAudioAssist;
         DrawPointer ();
@@ -2351,12 +2375,6 @@ UiMenuMain (
         Selected = Selected < (VisibleIndex - 1) ? ++Selected : 0;
         mCurrentSelection = Selected;
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
-        PrintTextDescription (MaxStrWidth,
-                              Selected,
-                              BootEntries[DefaultEntry].Name,
-                              BootEntries[DefaultEntry].IsExternal,
-                              BootEntries[DefaultEntry].IsFolder
-                              );
         TimeOutSeconds = 0;
         PlayChosen = Context->PickerAudioAssist;
         DrawPointer ();
@@ -2366,12 +2384,6 @@ UiMenuMain (
         Selected = mCurrentSelection;
         DefaultEntry = VisibleList[Selected];
         SwitchIconSelection (VisibleIndex, Selected, TRUE);
-        PrintTextDescription (MaxStrWidth,
-                              Selected,
-                              BootEntries[DefaultEntry].Name,
-                              BootEntries[DefaultEntry].IsExternal,
-                              BootEntries[DefaultEntry].IsFolder
-                              );
         TimeOutSeconds = 0;
         PlayChosen = Context->PickerAudioAssist;
         DrawPointer ();
