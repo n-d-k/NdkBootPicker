@@ -1038,7 +1038,7 @@ InitScreen (
   }
   DEBUG ((DEBUG_INFO, "OCUI: Initialize Graphic Screen...%r\n", Status));
   
-  mTextScale = (mTextScale == 0 && mScreenHeight >= 2160 && !(FileExist (L"EFI\\OC\\Icons\\No_text_scaling.png"))) ? 20 : 16;
+  mTextScale = (mTextScale == 0 && mScreenHeight >= 2160 && !(FileExist (L"EFI\\OC\\Icons\\No_text_scaling.png"))) ? 28 : 16;
   if (mUiScale == 0 && mScreenHeight >= 2160 && !(FileExist (L"EFI\\OC\\Icons\\No_icon_scaling.png"))) {
     mUiScale = 32;
     mIconPaddingSize = 16;
@@ -1403,6 +1403,7 @@ PrintLabel (
   NDK_UI_IMAGE    *NewImage;
   NDK_UI_IMAGE    *LabelImage;
   UINTN           Index;
+  UINTN           Needle;
   CHAR16          *String;
   UINTN           Length;
   INTN            Rows;
@@ -1410,7 +1411,7 @@ PrintLabel (
   INTN            NewXpos;
   INTN            NewYpos;
   
-  Length = (144 / mFontWidth) + 2;
+  Length = (144 / mFontWidth);
   Rows = mMenuImage->Height / mIconSpaceSize;
   IconsPerRow = mMenuImage->Width / mIconSpaceSize;
   NewXpos = Xpos;
@@ -1419,8 +1420,13 @@ PrintLabel (
   for (Index = 0; Index < VisibleIndex; ++Index) {
     if (StrLen (Entries[VisibleList[Index]].Name) > Length) {
       String = AllocateZeroPool ((Length + 1) * sizeof (CHAR16));
-      StrnCpyS (String, Length + 1, Entries[VisibleList[Index]].Name, Length - 2);
-      StrCatS (String, Length + 1, L"..");
+      StrnCpyS (String, Length + 1, Entries[VisibleList[Index]].Name, Length);
+      for (Needle = Length; Needle > 0; --Needle) {
+        if (String[Needle] == 0x20) {
+          StrnCpyS (String, Needle + 2, Entries[VisibleList[Index]].Name, Needle + 1);
+          break;
+        }
+      }
       TextImage = CreateTextImage (String);
       FreePool (String);
     } else {
@@ -1431,9 +1437,9 @@ PrintLabel (
       return;
     }
     
-    LabelImage = CopyScaledImage (mLabelImage, mUiScale);
+    LabelImage = CopyScaledImage (mLabelImage, (mIconSpaceSize << 4) / mLabelImage->Width);
      
-    NewImage = CreateImage (MIN (LabelImage->Width, mIconSpaceSize), LabelImage->Height, FALSE);
+    NewImage = CreateImage (LabelImage->Width, LabelImage->Height, FALSE);
     
     if (Index == IconsPerRow) {
       NewXpos = Xpos;
