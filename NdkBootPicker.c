@@ -491,7 +491,7 @@ BltMenuImage (
                    NewImage->Height,
                    NewImage->Width,
                    Image->Width,
-                   mAlphaEffect ? 150 : 0
+                   mAlphaEffect ? 200 : 0
                    );
   
   DrawImageArea (NewImage, 0, 0, 0, 0, Xpos, Ypos);
@@ -843,7 +843,7 @@ SwitchIconSelection (
                        SelectorImage->Height,
                        NewImage->Width,
                        SelectorImage->Width,
-                       200
+                       0
                        );
       
       FreeImage (SelectorImage);
@@ -875,7 +875,7 @@ SwitchIconSelection (
                    Icon->Height,
                    NewImage->Width,
                    Icon->Width,
-                   (!Selected && mAlphaEffect) ? 150 : 0
+                   (!Selected && mAlphaEffect) ? 200 : 0
                    );
   
   FreeImage (Icon);
@@ -1363,6 +1363,10 @@ PrintTextGraphicXY (
     return;
   }
   
+  if (Xpos < 0) {
+    Xpos = (mScreenWidth - TextImage->Width) / 2;
+  }
+  
   if ((Xpos + TextImage->Width + 8) > mScreenWidth) {
     Xpos = mScreenWidth - (TextImage->Width + 8);
   }
@@ -1379,7 +1383,7 @@ PrintTextGraphicXY (
                      NewImage->Height,
                      NewImage->Width,
                      TextImage->Width,
-                     150
+                     200
                      );
     FreeImage (TextImage);
     BltImageAlpha (NewImage, Xpos, Ypos, &mTransparentPixel, 16);
@@ -1497,8 +1501,8 @@ PrintDateTime (
     ClearScreenArea (&mTransparentPixel, 0, 0, mScreenWidth, mFontHeight * 5);
     UnicodeSPrint (DateStr, sizeof (DateStr), L" %02u/%02u/%04u", DateTime.Month, DateTime.Day, DateTime.Year);
     UnicodeSPrint (TimeStr, sizeof (TimeStr), L"%02u:%02u:%02u%s", Hour, DateTime.Minute, DateTime.Second, Str);
-    PrintTextGraphicXY (DateStr, mScreenWidth, 5, TRUE);
-    PrintTextGraphicXY (TimeStr, mScreenWidth, (mTextScale == 16) ? (mFontHeight + 5 + 2) : ((mFontHeight * 2) + 5 + 2), TRUE);
+    PrintTextGraphicXY (DateStr, mScreenWidth, 5, FALSE);
+    PrintTextGraphicXY (TimeStr, mScreenWidth, (mTextScale == 16) ? (mFontHeight + 5 + 2) : ((mFontHeight * 2) + 5 + 2), FALSE);
   } else {
     ClearScreenArea (&mTransparentPixel, 0, 0, mScreenWidth, mFontHeight * 5);
   }
@@ -1519,7 +1523,7 @@ PrintOcVersion (
   
   NewString = AsciiStrCopyToUnicode (String, 0);
   if (String != NULL && ShowAll) {
-    PrintTextGraphicXY (NewString, mScreenWidth, mScreenHeight, TRUE);
+    PrintTextGraphicXY (NewString, mScreenWidth, mScreenHeight, FALSE);
   } else {
     ClearScreenArea (&mTransparentPixel,
                        mScreenWidth - ((StrLen(NewString) * mFontWidth) * 2),
@@ -1536,36 +1540,11 @@ PrintTimeOutMessage (
   IN UINTN             Timeout
   )
 {
-  NDK_UI_IMAGE         *TextImage;
-  NDK_UI_IMAGE         *NewImage;
   CHAR16               String[52];
   
-  TextImage = NULL;
-  NewImage = NULL;
-  
   if (Timeout > 0) {
-    UnicodeSPrint (String, sizeof (String), L"%s %02u %s.", L"The default boot selection will start in", Timeout, L"seconds"); //52
-    TextImage = CreateTextImage (String);
-    if (TextImage == NULL) {
-      return !(Timeout > 0);
-    }
-    NewImage = CreateImage (TextImage->Width, TextImage->Height, TRUE);
-    if (NewImage == NULL) {
-      FreeImage (TextImage);
-      return !(Timeout > 0);
-    }
-    
-    RawComposeAlpha (NewImage->Bitmap,
-                     TextImage->Bitmap,
-                     NewImage->Width,
-                     NewImage->Height,
-                     NewImage->Width,
-                     TextImage->Width,
-                     150
-                     );
-    
-    FreeImage (TextImage);
-    BltImageAlpha (NewImage, (mScreenWidth - NewImage->Width) / 2, (mScreenHeight / 4) * 3, &mTransparentPixel, 16);
+    UnicodeSPrint (String, sizeof (String), L"%s %02u %s.", L"The default boot selection will start in", Timeout, L"seconds");
+    PrintTextGraphicXY (String, -1, (mScreenHeight / 4) * 3, FALSE);
   } else {
     ClearScreenArea (&mTransparentPixel, 0, ((mScreenHeight / 4) * 3) - 4, mScreenWidth, mFontHeight * 2);
   }
