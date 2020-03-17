@@ -1045,7 +1045,7 @@ InitScreen (
     mIconSpaceSize = 288;
   } else if (mUiScale == 0 && mScreenHeight <= 800) {
     mUiScale = 8;
-    mTextScale = 8;
+    mTextScale = 16;
     mIconPaddingSize = 3;
     mIconSpaceSize = 70;
   } else {
@@ -1423,7 +1423,7 @@ PrintLabel (
   
   for (Index = 0; Index < VisibleIndex; ++Index) {
     if (StrLen (Entries[VisibleList[Index]].Name) > Length) {
-      String = AllocateZeroPool ((Length + 1) * sizeof (CHAR16));
+      String = AllocateZeroPool ((Length + 2) * sizeof (CHAR16));
       StrnCpyS (String, Length + 1, Entries[VisibleList[Index]].Name, Length);
       for (Needle = Length; Needle > 0; --Needle) {
         if (String[Needle] == 0x20) {
