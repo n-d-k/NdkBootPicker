@@ -2313,7 +2313,6 @@ UiMenuMain (
     for (Index = 0, VisibleIndex = 0; Index < MIN (Count, OC_INPUT_MAX); ++Index) {
       if ((BootEntries[Index].Type == OC_BOOT_APPLE_RECOVERY && !ShowAll)
           || (BootEntries[Index].Type == OC_BOOT_APPLE_TIME_MACHINE && !ShowAll)
-          || (BootEntries[Index].Type == OC_BOOT_UNKNOWN && !ShowAll)
           || (BootEntries[Index].DevicePath == NULL && !ShowAll)
           || (BootEntries[Index].IsAuxiliary && !ShowAll)) {
         DefaultEntry = DefaultEntry == Index ? ++DefaultEntry : DefaultEntry;
