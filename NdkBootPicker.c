@@ -741,7 +741,7 @@ CreateIcon (
   }
   
   if (Icon != NULL) {
-    TmpImage = CreateFilledImage (128, 128, TRUE, &mTransparentPixel);
+    TmpImage = CreateFilledImage (Icon->Width, Icon->Height, TRUE, &mTransparentPixel);
     IsAlpha = Icon->IsAlpha;
     Icon->IsAlpha = FALSE;
     ComposeImage (Icon, TmpImage, 0, 0);
