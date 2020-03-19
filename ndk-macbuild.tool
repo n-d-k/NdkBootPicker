@@ -52,7 +52,7 @@ package() {
   mkdir -p tmp/EFI/OC/Icons || exit 1
   mkdir -p tmp/EFI/OC/Drivers || exit 1
   cp NdkBootPicker.efi tmp/EFI/OC/Drivers/ || exit 1
-  cp -r "${selfdir}/Themes/2k/Light/Icons/" tmp/EFI/OC/Icons/ || exit 1
+  cp -r "${selfdir}/Themes/Default/Light/Icons/" tmp/EFI/OC/Icons/ || exit 1
   pushd tmp || exit 1
   zip -qry -FS ../"NdkBootPicker-${ver}-${2}.zip" * || exit 1
   popd || exit 1
