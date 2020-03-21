@@ -1086,6 +1086,7 @@ InitScreen (
     mTextScale = 16;
     mIconPaddingSize = 3;
     mIconSpaceSize = 70;
+    mPrintLabel = FALSE;
   } else {
     mUiScale = 16;
     mIconPaddingSize = 8;
