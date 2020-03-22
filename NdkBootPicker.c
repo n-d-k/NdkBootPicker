@@ -749,7 +749,8 @@ VOID
 SwitchIconSelection (
   IN UINTN               IconCount,
   IN UINTN               IconIndex,
-  IN BOOLEAN             Selected
+  IN BOOLEAN             Selected,
+  IN BOOLEAN             Clicked
   )
 {
   NDK_UI_IMAGE           *NewImage;
@@ -763,6 +764,7 @@ SwitchIconSelection (
   UINT16                 Height;
   UINTN                  IconsPerRow;
   INTN                   IconRowSpace;
+  INTN                   AnimatedDistance;
   
   /* Begin Calculating Xpos and Ypos of current selected icon on screen*/
   NewImage = NULL;
@@ -774,6 +776,7 @@ SwitchIconSelection (
   Height = Width;
   IconsPerRow = 1;
   IconRowSpace = (32 * mUiScale >> 4) + 10;
+  AnimatedDistance = (mIconPaddingSize + 1) >> 1;
   
   for (IconsPerRow = 1; IconsPerRow < IconCount; ++IconsPerRow) {
     Width = Width + mIconSpaceSize;
@@ -812,53 +815,42 @@ SwitchIconSelection (
            );
   
   if (Selected && mSelectorUsed) {
-    if (mSelectionImage != NULL && (mSelectionImage->Width == 144 || mSelectionImage->Width == 288)) {
-      NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize, FALSE);
-      
-      RawCopy (NewImage->Bitmap,
-               mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
-               mIconSpaceSize,
-               mIconSpaceSize,
-               mIconSpaceSize,
-               mBackgroundImage->Width
-               );
-      
-      SelectorImage = CopyScaledImage (mSelectionImage, (mSelectionImage->Width == mIconSpaceSize) ? 16 : mUiScale);
-      
-      Offset = (NewImage->Width - SelectorImage->Width) >> 1;
-      
-      RawCompose (NewImage->Bitmap + Offset * NewImage->Width + Offset,
-                  SelectorImage->Bitmap,
-                  SelectorImage->Width,
-                  SelectorImage->Height,
-                  NewImage->Width,
-                  SelectorImage->Width
-                  );
-      
-      FreeImage (SelectorImage);
-    } else {
-      NewImage = CreateFilledImage (mIconSpaceSize, mIconSpaceSize, FALSE, mFontColorPixel);
-      RawCopy (NewImage->Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
-               mBackgroundImage->Bitmap + (Ypos + mIconPaddingSize) * mBackgroundImage->Width + (Xpos + mIconPaddingSize),
-               mIconSpaceSize - (mIconPaddingSize * 2),
-               mIconSpaceSize - (mIconPaddingSize * 2),
-               mIconSpaceSize,
-               mBackgroundImage->Width
-               );
-    }
-  } else {
-    NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize, FALSE);
+    NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize + AnimatedDistance, FALSE);
     
     RawCopy (NewImage->Bitmap,
-             mBackgroundImage->Bitmap + Ypos * mBackgroundImage->Width + Xpos,
+             mBackgroundImage->Bitmap + (Ypos - AnimatedDistance) * mBackgroundImage->Width + Xpos,
              mIconSpaceSize,
+             mIconSpaceSize + AnimatedDistance,
              mIconSpaceSize,
+             mBackgroundImage->Width
+             );
+    
+    SelectorImage = CopyScaledImage (mSelectionImage, (mSelectionImage->Width == mIconSpaceSize) ? 16 : mUiScale);
+    
+    Offset = (NewImage->Width - SelectorImage->Width) >> 1;
+    
+    RawCompose (NewImage->Bitmap + (Clicked ? Offset + AnimatedDistance : Offset) * NewImage->Width + Offset,
+                SelectorImage->Bitmap,
+                SelectorImage->Width,
+                SelectorImage->Height,
+                NewImage->Width,
+                SelectorImage->Width
+                );
+    
+    FreeImage (SelectorImage);
+  } else {
+    NewImage = CreateImage (mIconSpaceSize, mIconSpaceSize + AnimatedDistance, FALSE);
+    
+    RawCopy (NewImage->Bitmap,
+             mBackgroundImage->Bitmap + (Ypos - AnimatedDistance) * mBackgroundImage->Width + Xpos,
+             mIconSpaceSize,
+             mIconSpaceSize + AnimatedDistance,
              mIconSpaceSize,
              mBackgroundImage->Width
              );
   }
   
-  RawComposeAlpha (NewImage->Bitmap + mIconPaddingSize * NewImage->Width + mIconPaddingSize,
+  RawComposeAlpha (NewImage->Bitmap + ((Selected && !Clicked) ? mIconPaddingSize : mIconPaddingSize + AnimatedDistance) * NewImage->Width + mIconPaddingSize,
                    Icon->Bitmap,
                    Icon->Width,
                    Icon->Height,
@@ -868,7 +860,7 @@ SwitchIconSelection (
                    );
   
   FreeImage (Icon);
-  BltImage (NewImage, Xpos, Ypos);
+  BltImage (NewImage, Xpos, Ypos - AnimatedDistance);
   FreeImage (NewImage);
 }
 
@@ -980,6 +972,8 @@ ClearScreen (
     mSelectionImage = DecodePNGFile (L"EFI\\OC\\Icons\\Selector4k.png");
   } else if (mSelectorUsed && FileExist (L"EFI\\OC\\Icons\\Selector.png")) {
     mSelectionImage = DecodePNGFile (L"EFI\\OC\\Icons\\Selector.png");
+  } else {
+    mSelectionImage = CreateFilledImage (mIconSpaceSize, mIconSpaceSize, FALSE, mFontColorPixel);
   }
   
   if (FileExist (L"EFI\\OC\\Icons\\No_label.png")) {
@@ -2344,7 +2338,7 @@ UiMenuMain (
       ++VisibleIndex;
     }
     
-    ClearScreenArea (&mTransparentPixel, 0, (mScreenHeight / 2) - mIconSpaceSize, mScreenWidth, mIconSpaceSize * 3);
+    ClearScreenArea (&mTransparentPixel, 0, (mScreenHeight / 2) - (mIconSpaceSize + 20), mScreenWidth, mIconSpaceSize * 3);
     BltMenuImage (mMenuImage, (mScreenWidth - mMenuImage->Width) / 2, (mScreenHeight / 2) - mIconSpaceSize);
     if (mPrintLabel) {
       PrintLabel (BootEntries, VisibleList, VisibleIndex, (mScreenWidth - mMenuImage->Width) / 2, (mScreenHeight / 2) - mIconSpaceSize);
@@ -2355,7 +2349,7 @@ UiMenuMain (
                           &BootEntries[DefaultEntry]
                           );
     
-    SwitchIconSelection (VisibleIndex, Selected, TRUE);
+    SwitchIconSelection (VisibleIndex, Selected, TRUE, FALSE);
     mCurrentSelection = Selected;
     mMenuIconsCount = VisibleIndex;
     
@@ -2401,6 +2395,7 @@ UiMenuMain (
       }
       --TimeOutSeconds;
       if ((KeyIndex == OC_INPUT_TIMEOUT && TimeOutSeconds == 0) || KeyIndex == OC_INPUT_CONTINUE) {
+        SwitchIconSelection (VisibleIndex, Selected, TRUE, TRUE);
         *ChosenBootEntry = &BootEntries[DefaultEntry];
         SetDefault = BootEntries[DefaultEntry].DevicePath != NULL
           && !BootEntries[DefaultEntry].IsAuxiliary
@@ -2430,11 +2425,11 @@ UiMenuMain (
         break;
       } else if (KeyIndex == OC_INPUT_UP || KeyIndex == OC_INPUT_LEFT) {
         HidePointer ();
-        SwitchIconSelection (VisibleIndex, Selected, FALSE);
+        SwitchIconSelection (VisibleIndex, Selected, FALSE, FALSE);
         DefaultEntry = Selected > 0 ? VisibleList[Selected - 1] : VisibleList[VisibleIndex - 1];
         Selected = Selected > 0 ? --Selected : VisibleIndex - 1;
         mCurrentSelection = Selected;
-        SwitchIconSelection (VisibleIndex, Selected, TRUE);
+        SwitchIconSelection (VisibleIndex, Selected, TRUE, FALSE);
         PrintTextDescription (MaxStrWidth,
                               Selected,
                               &BootEntries[DefaultEntry]
@@ -2444,11 +2439,11 @@ UiMenuMain (
         DrawPointer ();
       } else if (KeyIndex == OC_INPUT_DOWN || KeyIndex == OC_INPUT_RIGHT) {
         HidePointer ();
-        SwitchIconSelection (VisibleIndex, Selected, FALSE);
+        SwitchIconSelection (VisibleIndex, Selected, FALSE, FALSE);
         DefaultEntry = Selected < (VisibleIndex - 1) ? VisibleList[Selected + 1] : VisibleList[0];
         Selected = Selected < (VisibleIndex - 1) ? ++Selected : 0;
         mCurrentSelection = Selected;
-        SwitchIconSelection (VisibleIndex, Selected, TRUE);
+        SwitchIconSelection (VisibleIndex, Selected, TRUE, FALSE);
         PrintTextDescription (MaxStrWidth,
                               Selected,
                               &BootEntries[DefaultEntry]
@@ -2458,10 +2453,10 @@ UiMenuMain (
         DrawPointer ();
       } else if (KeyIndex == OC_INPUT_POINTER) {
         HidePointer ();
-        SwitchIconSelection (VisibleIndex, Selected, FALSE);
+        SwitchIconSelection (VisibleIndex, Selected, FALSE, FALSE);
         Selected = mCurrentSelection;
         DefaultEntry = VisibleList[Selected];
-        SwitchIconSelection (VisibleIndex, Selected, TRUE);
+        SwitchIconSelection (VisibleIndex, Selected, TRUE, FALSE);
         PrintTextDescription (MaxStrWidth,
                               Selected,
                               &BootEntries[DefaultEntry]
@@ -2471,6 +2466,7 @@ UiMenuMain (
         DrawPointer ();
       } else if (KeyIndex != OC_INPUT_INVALID && (UINTN)KeyIndex < VisibleIndex) {
         ASSERT (KeyIndex >= 0);
+        SwitchIconSelection (VisibleIndex, Selected, TRUE, TRUE);
         *ChosenBootEntry = &BootEntries[VisibleList[KeyIndex]];
         SetDefault = BootEntries[VisibleList[KeyIndex]].DevicePath != NULL
           && !BootEntries[VisibleList[KeyIndex]].IsAuxiliary
