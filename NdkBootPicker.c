@@ -1427,7 +1427,11 @@ PrintTextGraphicXY (
     Ypos = mScreenHeight - (TextImage->Height + 5);
   }
   
-  PointerInArea = IsMouseInPlace (Xpos, Ypos, TextImage->Width, TextImage->Height);
+  PointerInArea = IsMouseInPlace (Xpos - (POINTER_WIDTH * 2),
+                                  (Ypos - POINTER_HEIGHT) > 0 ? Ypos - POINTER_HEIGHT : 0,
+                                  TextImage->Width + (POINTER_WIDTH * 2),
+                                  TextImage->Height + POINTER_HEIGHT
+                                  );
   
   if (PointerInArea) {
     HidePointer ();
@@ -1550,11 +1554,11 @@ PrintDateTime (
     UnicodeSPrint (TimeStr, sizeof (TimeStr), L" %02u:%02u:%02u%s", Hour, DateTime.Minute, DateTime.Second, Str);
     
     Width = (((StrLen (DateStr) + 1) * (INTN) CHAR_WIDTH) * mTextScale) >> 4;
-    ClearScreenArea (&mTransparentPixel, mScreenWidth - Width, 0, mScreenWidth / 5, mFontHeight * 5);
+    ClearScreenArea (&mTransparentPixel, mScreenWidth - Width, 0, Width, ((mTextHeight * mTextScale) >> 4) * 2 + 5);
     PrintTextGraphicXY (DateStr, mScreenWidth, 5);
-    PrintTextGraphicXY (TimeStr, mScreenWidth, (mTextScale == 16) ? (mFontHeight + 5 + 2) : ((mFontHeight * 2) + 5 + 2));
+    PrintTextGraphicXY (TimeStr, mScreenWidth, ((mTextHeight * mTextScale) >> 4) + 5);
   } else {
-    ClearScreenArea (&mTransparentPixel, mScreenWidth - (mScreenWidth / 5), 0, mScreenWidth / 5, mFontHeight * 5);
+    ClearScreenArea (&mTransparentPixel, mScreenWidth - (mScreenWidth / 5), 0, mScreenWidth / 5, ((mTextHeight * mTextScale) >> 4) * 2 + 5);
   }
 }
 
@@ -1854,7 +1858,7 @@ MouseInRect (
   return  ((mPointer.NewPlace.Xpos >= Place->Xpos)
            && (mPointer.NewPlace.Xpos < (Place->Xpos + (INTN) Place->Width))
            && (mPointer.NewPlace.Ypos >= Place->Ypos)
-           && (mPointer.NewPlace.Ypos < (Place->Ypos + (INTN) Place->Height)  + (32 * mUiScale >> 4) + 10)
+           && (mPointer.NewPlace.Ypos < (Place->Ypos + (INTN) Place->Height))
            );
 }
 
