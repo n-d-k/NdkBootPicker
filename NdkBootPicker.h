@@ -115,8 +115,8 @@ typedef struct _NDK_UI_ICON {
 #define POINTER_HEIGHT 32
 
 #define OC_INPUT_POINTER  -50       ///< Pointer left click
-#define OC_INPUT_MENU     -51 ///<Mouse LeftClick
-#define OC_INPUT_TAB      -52 ///<Mouse LeftClick
+#define OC_INPUT_MENU     -51       ///<Tab back to menu entries
+#define OC_INPUT_TAB      -52       ///<Tab away from menu entries
 
 typedef enum {
   NoEvents,
