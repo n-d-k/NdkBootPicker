@@ -36,12 +36,16 @@ POINTERS mPointer = {NULL, NULL, NULL, NULL, NULL,
 {0, 0, 0, FALSE, FALSE}, NoEvents};
 
 STATIC
-INTN
+UINT8
 mPointerSpeed = 6;
 
 STATIC
 UINT64
 mDoubleClickTime = 500;
+
+STATIC
+BOOLEAN
+mPointerIsActive = FALSE;
 
 /*========== Graphic UI Setting ==========*/
 
@@ -1608,7 +1612,7 @@ HidePointer (
   VOID
   )
 {
-  if (mPointer.SimplePointerProtocol != NULL) {
+  if (mPointer.SimplePointerProtocol != NULL && mPointerIsActive) {
     DrawImageArea (mPointer.OldImage, 0, 0, 0, 0, mPointer.OldPlace.Xpos, mPointer.OldPlace.Ypos);
   }
 }
@@ -1618,7 +1622,7 @@ DrawPointer (
   VOID
   )
 {
-  if (mPointer.SimplePointerProtocol == NULL) {
+  if (mPointer.SimplePointerProtocol == NULL || !mPointerIsActive) {
     return;
   }
   TakeImage (mPointer.OldImage,
@@ -1673,6 +1677,7 @@ InitMouse (
 {
   EFI_STATUS          Status;
   CONST CHAR16        *FilePath;
+  UINTN               DataSize;
   
   Status = EFI_UNSUPPORTED;
   
@@ -1729,8 +1734,24 @@ InitMouse (
   
   mPointer.OldImage = CreateImage(POINTER_WIDTH, POINTER_HEIGHT, FALSE);
   mPointer.NewImage = CreateFilledImage(POINTER_WIDTH, POINTER_HEIGHT, TRUE, &mTransparentPixel);
-  DrawPointer ();
-  mPointer.MouseEvent = NoEvents;
+  
+  DataSize = sizeof (mPointerSpeed);
+  
+  Status = gRT->GetVariable (
+                             UI_MENU_POINTER_SPEED,
+                             &gAppleVendorVariableGuid,
+                             NULL,
+                             &DataSize,
+                             (VOID *) &mPointerSpeed
+                             );
+  
+  if (EFI_ERROR (Status) || mPointerSpeed < 1) {
+    DEBUG ((DEBUG_INFO, "OCUI: No PointerSpeed found!, using default %d\n", mPointerSpeed));
+    mPointerSpeed = 6;
+  } else {
+    DEBUG ((DEBUG_INFO, "OCUI: Set PointerSpeed to %d\n", mPointerSpeed));
+  }
+  
   return Status;
 }
 
@@ -1768,6 +1789,10 @@ PointerUpdate (
     } else if (mPointer.State.RelativeMovementZ < 0) {
       mPointer.MouseEvent = ScrollUp;
     } else if (mPointer.State.RelativeMovementX || mPointer.State.RelativeMovementY) {
+      if (!mPointerIsActive) {
+        mPointerIsActive = TRUE;
+        DrawPointer ();
+      }
       mPointer.MouseEvent = MouseMove;
     } else {
       mPointer.MouseEvent = NoEvents;
@@ -1776,7 +1801,7 @@ PointerUpdate (
     CopyMem (&mPointer.State, &tmpState, sizeof(EFI_SIMPLE_POINTER_STATE));
     CurrentMode = mPointer.SimplePointerProtocol->Mode;
   
-    ScreenRelX = ((mScreenWidth * mPointer.State.RelativeMovementX / (INTN) CurrentMode->ResolutionX) * mPointerSpeed) >> 10;
+    ScreenRelX = (mScreenWidth * mPointer.State.RelativeMovementX * (INTN) mPointerSpeed / (INTN) CurrentMode->ResolutionX) >> 10;
     
     mPointer.NewPlace.Xpos += ScreenRelX;
     
@@ -1787,7 +1812,7 @@ PointerUpdate (
       mPointer.NewPlace.Xpos = mScreenWidth - 1;
     }
     
-    ScreenRelY = ((mScreenHeight * mPointer.State.RelativeMovementY / (INTN) CurrentMode->ResolutionY) * mPointerSpeed) >> 10;
+    ScreenRelY = (mScreenHeight * mPointer.State.RelativeMovementY * (INTN) mPointerSpeed / (INTN) CurrentMode->ResolutionY) >> 10;
     mPointer.NewPlace.Ypos += ScreenRelY;
     
     if (mPointer.NewPlace.Ypos < 0) {
@@ -2072,6 +2097,7 @@ KillMouse (
   mPointer.IsClickable = FALSE;
   mPointer.MouseEvent = NoEvents;
   mPointer.SimplePointerProtocol = NULL;
+  mPointerIsActive = FALSE;
 }
 
 /* Mouse Functions End*/
