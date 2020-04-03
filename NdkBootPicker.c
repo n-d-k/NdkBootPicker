@@ -1914,7 +1914,7 @@ CreateToolBar (
   LabelImage = CreateTextImage (UI_MENU_SYSTEM_RESET);
   Offset = (mIconReset.Image->Width - LabelImage->Width) >> 1;
   BltImageAlpha (LabelImage,
-                 mIconReset.Xpos + (Offset < 0 ? (-Offset) : Offset),
+                 mIconReset.Xpos + ABS (Offset),
                  mIconReset.Ypos + mIconReset.Image->Height - IconScale,
                  &mTransparentPixel,
                  16
@@ -1923,7 +1923,7 @@ CreateToolBar (
   LabelImage = CreateTextImage (UI_MENU_SYSTEM_SHUTDOWN);
   Offset = (mIconShutdown.Image->Width - LabelImage->Width) >> 1;
   BltImageAlpha (LabelImage,
-                 mIconShutdown.Xpos + (Offset < 0 ? (-Offset) : Offset),
+                 mIconShutdown.Xpos + ABS (Offset),
                  mIconShutdown.Ypos + mIconShutdown.Image->Height - IconScale,
                  &mTransparentPixel,
                  16
