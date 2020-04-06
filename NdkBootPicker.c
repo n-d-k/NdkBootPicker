@@ -328,7 +328,7 @@ CreateMenuImage (
   NewImage = NULL;
   Xpos = 0;
   Ypos = 0;
-  IconRowSpace = (32 * mUiScale >> 4) + 10;
+  IconRowSpace = (32 * mUiScale >> 4) + ICON_ROW_SPACE_OFFSET;
   
   if (mMenuImage != NULL) {
     Width = mMenuImage->Width;
@@ -730,7 +730,7 @@ SwitchIconSelection (
   Width = mIconSpaceSize;
   Height = Width;
   IconsPerRow = 1;
-  IconRowSpace = (32 * mUiScale >> 4) + 10;
+  IconRowSpace = (32 * mUiScale >> 4) + ICON_ROW_SPACE_OFFSET;
   AnimatedDistance = (mIconPaddingSize + 1) >> 1;
   
   for (IconsPerRow = 1; IconsPerRow < IconCount; ++IconsPerRow) {
@@ -1449,7 +1449,7 @@ PrintLabel (
     
     if (Index == IconsPerRow) {
       NewXpos = Xpos;
-      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + 10;
+      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + ICON_ROW_SPACE_OFFSET;
     }
      
     TakeImage (NewImage, NewXpos, NewYpos + mIconSpaceSize + 10, LabelImage->Width, LabelImage->Height);
@@ -2031,7 +2031,7 @@ CheckIconClick (
     NewXpos = NewXpos + mIconSpaceSize;
     if (Index == (IconsPerRow - 1)) {
       NewXpos = Xpos;
-      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + 10;
+      NewYpos = Ypos + mIconSpaceSize + (32 * mUiScale >> 4) + ICON_ROW_SPACE_OFFSET;
     }
   }
   
