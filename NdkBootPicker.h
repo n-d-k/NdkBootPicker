@@ -35,7 +35,7 @@
 #include <Library/OcMiscLib.h>
 #include <Library/OcTimerLib.h>
 
-#define NDK_BOOTPICKER_VERSION   "0.1.8"
+#define NDK_BOOTPICKER_VERSION   "0.1.9"
 
 /*========== UI's defined variables ==========*/
 
