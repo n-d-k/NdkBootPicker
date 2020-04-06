@@ -118,7 +118,6 @@ fi
 if ! $valid_mtoc; then
   echo "Missing or incompatible mtoc!"
   echo "To build mtoc follow: https://github.com/tianocore/tianocore.github.io/wiki/Xcode#mac-os-x-xcode"
-  prompt "Install prebuilt mtoc automatically?"
   pushd /tmp >/dev/null
   rm -f mtoc mtoc-mac64.zip
   curl -OL "https://github.com/acidanthera/ocbuild/raw/master/external/mtoc-mac64.zip" || exit 1
