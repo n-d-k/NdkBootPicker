@@ -663,7 +663,7 @@ CreateIcon (
     case OC_BOOT_APPLE_ANY:
       FilePath = UI_ICON_MAC;
       break;
-    case OC_BOOT_SYSTEM:
+    case OC_BOOT_RESET_NVRAM:
       FilePath = UI_ICON_RESETNVRAM;
       break;
     case OC_BOOT_UNKNOWN:
