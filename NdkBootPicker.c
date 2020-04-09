@@ -2150,6 +2150,7 @@ OcWaitForKeyIndex (
     if (mPointer.SimplePointerProtocol != NULL) {
       PointerUpdate();
       switch (mPointer.MouseEvent) {
+        case DoubleClick:
         case LeftClick:
           mPointer.MouseEvent = NoEvents;
           KeyClick = CheckIconClick ();
@@ -2170,17 +2171,6 @@ OcWaitForKeyIndex (
         case RightClick:
           mPointer.MouseEvent = NoEvents;
           return OC_INPUT_MORE;
-        case DoubleClick:
-          mPointer.MouseEvent = NoEvents;
-          KeyClick = CheckIconClick ();
-          if (KeyClick >= 0) {
-            if (HasCommand && (OcGetArgumentFromCmd (Context->AppleBootArgs, "-v", L_STR_LEN ("-v")) == NULL)) {
-              DEBUG ((DEBUG_INFO, "OCB: CMD+V means -v\n"));
-              OcAppendArgumentToCmd (Context, Context->AppleBootArgs, "-v", L_STR_LEN ("-v"));
-            }
-            return KeyClick;
-          }
-          break;
         case MouseMove:
           CycleCount++;
           mPointer.MouseEvent = NoEvents;
